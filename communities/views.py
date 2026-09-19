@@ -64,6 +64,19 @@ def home(request):
     })
 
 
+@login_required
+@never_cache
+def home_presence(request):
+    """Présences des administrateurs (accueil) pour le rafraîchissement en direct."""
+    admins = list(User.objects.filter(is_site_admin=True, is_banned=False))
+    online = [a.username for a in admins if a.is_online]
+    return JsonResponse({
+        'online': online,
+        'admin_count': len(admins),
+        'online_count': len(online),
+    })
+
+
 @never_cache
 def community_detail(request, slug):
     community = get_object_or_404(Community, slug=slug)
@@ -208,12 +221,56 @@ def support_thread(request, slug, thread_pk):
     elif thread.admin_id:
         thread.messages.filter(author=thread.admin, is_read=False).update(is_read=True)
 
+    smsgs = thread.messages.select_related('author')
     return render(request, 'communities/support_thread.html', {
         'community': community,
         'thread': thread,
         'deleted_notice': True if thread.deleted else False,
-        'smsgs': thread.messages.select_related('author'),
+        'smsgs': smsgs,
+        'last_support_pk': max((m.pk for m in smsgs), default=0),
         'reply_form': SupportReplyForm(),
+    })
+
+
+@never_cache
+@require_GET
+def support_poll(request, slug, thread_pk):
+    """Point d'accès JSON de la discussion d'assistance (nouveaux messages)."""
+    thread = get_object_or_404(
+        SupportThread, pk=thread_pk, community__slug=slug, deleted=False)
+    if not _support_access(request.user, thread):
+        return JsonResponse({'error': 'Accès refusé.'}, status=403)
+    try:
+        after = max(0, int(request.GET.get('after', 0)))
+    except (TypeError, ValueError):
+        after = 0
+    new_messages = (
+        thread.messages
+        .filter(pk__gt=after)
+        .select_related('author')
+        .order_by('pk')[:50]
+    )
+    messages = [
+        {
+            'pk': m.pk,
+            'author': m.author.username if m.author else 'Utilisateur supprimé',
+            'is_guest': bool(m.author and m.author.is_guest),
+            'is_admin': bool(m.author and m.author.is_site_admin),
+            'text': m.text,
+            'time': timezone.localtime(m.created_at).isoformat(),
+        }
+        for m in new_messages
+    ]
+    if thread.status == 'open':
+        fresh = thread.messages.filter(pk__gt=after)
+        if request.user.pk == thread.admin_id:
+            fresh.filter(author_id=thread.user_id).update(is_read=True)
+        elif request.user.pk == thread.user_id:
+            fresh.filter(author_id=thread.admin_id).update(is_read=True)
+    return JsonResponse({
+        'messages': messages,
+        'count': thread.messages.count(),
+        'status': thread.status,
     })
 
 

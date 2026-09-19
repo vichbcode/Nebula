@@ -101,6 +101,26 @@
     background: linear-gradient(135deg, var(--primary), var(--primary-2));
     color: #fff; padding: 0 6px; flex: none;
   }
+
+  .call-modal { height: 100vh; height: 100dvh; }
+  @media (max-width: 600px) {
+    .call-grid {
+      grid-template-columns: 1fr;
+      grid-auto-rows: minmax(140px, 30vh);
+      padding-top: calc(64px + env(safe-area-inset-top));
+      padding-bottom: calc(110px + env(safe-area-inset-bottom));
+    }
+    .call-local {
+      width: 92px; height: 130px;
+      bottom: calc(92px + env(safe-area-inset-bottom)); right: 10px;
+    }
+    .call-toolbar {
+      bottom: calc(14px + env(safe-area-inset-bottom));
+      gap: 6px; padding: 8px 10px;
+    }
+    .call-btn { min-width: 58px; padding: 7px 8px; }
+    .call-btn.danger { min-width: 66px; }
+  }
 </style>
 {% endblock %}
 

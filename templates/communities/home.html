@@ -36,7 +36,7 @@
     </div>
     <ul class="admins-list">
       {% for a in admins %}
-        <li class="admin-chip" title="{{ a.username }}{% if a.is_online %} — en ligne{% endif %}">
+        <li class="admin-chip" data-user="{{ a.username }}" title="{{ a.username }}{% if a.is_online %} — en ligne{% endif %}">
           <div class="chat-avatar admin">{{ a.username|slice:":1"|upper }}</div>
           <div class="member-info">
             <span class="chat-author">
@@ -45,7 +45,7 @@
               {% endif %}
               {{ a.username }}
             </span>
-            <span class="member-role">
+            <span class="member-role" data-presence-role>
               {% if a.is_online %}<span class="on">En ligne</span>{% else %}Hors ligne{% endif %}
             </span>
           </div>
@@ -112,4 +112,40 @@
     <p class="muted">Il n'y a encore aucune communauté accessible. Reviens plus tard !</p>
   </div>
 {% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  var presenceUrl = '{% url 'communities:home_presence' %}';
+  function refreshPresence(online) {
+    var set = {};
+    online.forEach(function (u) { set[u] = true; });
+    Array.prototype.forEach.call(document.querySelectorAll('.admin-chip[data-user]'), function (chip) {
+      var on = set[chip.getAttribute('data-user')] === true;
+      var role = chip.querySelector('[data-presence-role]');
+      if (role) {
+        role.textContent = on ? 'En ligne' : 'Hors ligne';
+        role.className = 'member-role' + (on ? ' on' : '');
+      }
+      var author = chip.querySelector('.chat-author');
+      var dot = chip.querySelector('.online-dot');
+      if (on && !dot && author) {
+        var d = document.createElement('span');
+        d.className = 'online-dot';
+        d.title = 'En ligne';
+        author.insertBefore(d, author.firstChild);
+      } else if (!on && dot) {
+        dot.parentNode.removeChild(dot);
+      }
+    });
+  }
+  function pollPresence() {
+    fetch(presenceUrl, { credentials: 'same-origin' })
+      .then(function (r) { if (!r.ok) throw new Error('bad'); return r.json(); })
+      .then(function (data) { if (data && data.online) refreshPresence(data.online); })
+      .catch(function () {});
+  }
+  pollPresence();
+  setInterval(pollPresence, 5000);
+</script>
 {% endblock %}

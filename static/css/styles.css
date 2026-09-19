@@ -781,6 +781,59 @@ select.input { appearance: none; -webkit-appearance: none; cursor: pointer; }
 ::-webkit-scrollbar-thumb { background: rgba(139,148,184,0.25); border-radius: 99px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(139,148,184,0.4); }
 
+/* ---------- Ergonomie mobile & temps réel ---------- */
+@keyframes dotPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.55); }
+  50% { box-shadow: 0 0 0 6px rgba(52, 211, 153, 0); }
+}
+.online-dot { animation: dotPulse 2.2s ease-out infinite; }
+
+.btn, .bottomnav-item, .icon-btn, .call-btn {
+  -webkit-tap-highlight-color: transparent;
+}
+.btn:focus-visible, .bottomnav-item:focus-visible, .input:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+.chat-meta { flex-wrap: wrap; row-gap: 2px; }
+
+@media (max-width: 760px) {
+  .navbar-inner {
+    padding-top: calc(12px + env(safe-area-inset-top));
+    gap: 8px;
+  }
+  .brand-name { font-size: 0.9rem; }
+  .nav-user .pill {
+    max-width: 34vw; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap;
+  }
+  .nav-user .btn { min-height: 40px; padding: 8px 12px; }
+  .btn { min-height: 44px; }
+  .btn.small { min-height: 40px; }
+  .input, .chat-form textarea, textarea.input { font-size: 16px; }
+  .page { padding-top: 14px; }
+  .page-title { font-size: 1.4rem; }
+  .card { padding: 16px; }
+  .head-actions { width: 100%; }
+  .head-actions .btn { flex: 1 1 auto; }
+  .chat-card { max-height: 76vh; }
+  .chat-avatar { width: 40px; height: 40px; }
+  .chat-msg { gap: 8px; }
+  .member-row { padding: 10px 6px; }
+  .bottomnav-item { min-height: 46px; font-size: 0.7rem; padding: 6px 10px; }
+  .toast-stack {
+    top: auto;
+    left: 10px; right: 10px;
+    bottom: calc(88px + env(safe-area-inset-bottom));
+    max-width: none;
+  }
+  .admins-list { flex-direction: column; align-items: stretch; }
+  .admin-chip { border-radius: 14px; padding: 10px 14px 10px 10px; }
+  .community-actions { flex-wrap: wrap; }
+  .community-actions .btn { min-height: 44px; }
+  .container { padding: 0 14px; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }
 }

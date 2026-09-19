@@ -9,6 +9,7 @@ app_name = 'communities'
 urlpatterns = [
     path('', views.index, name='index'),
     path('accueil/', views.home, name='home'),
+    path('accueil/presence/', views.home_presence, name='home_presence'),
 
     path('communaute/<slug:slug>/', views.community_detail, name='detail'),
     path('communaute/<slug:slug>/rejoindre/', views.join_community, name='join'),
@@ -22,6 +23,7 @@ urlpatterns = [
     path('communaute/<slug:slug>/aide/<int:thread_pk>/repondre/', views.support_reply, name='support_reply'),
     path('communaute/<slug:slug>/aide/<int:thread_pk>/fermer/', views.support_close, name='support_close'),
     path('communaute/<slug:slug>/aide/<int:thread_pk>/supprimer/', views.support_delete, name='support_delete'),
+    path('communaute/<slug:slug>/aide/<int:thread_pk>/messages/', views.support_poll, name='support_poll'),
 
     path('communaute/<slug:slug>/appel/lancer/', views.start_call, name='start_call'),
     path('communaute/<slug:slug>/appel/<int:call_pk>/terminer/', views.end_call, name='end_call'),

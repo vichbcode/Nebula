@@ -48,7 +48,7 @@
 <section class="card chat-card">
   <div class="card-headline">
     <h3 class="card-title">{{ thread.admin.username|default:'Discussion' }}</h3>
-    <span class="muted">{{ smsgs|length }} message{% if smsgs|length > 1 %}s{% endif %}</span>
+    <span class="muted"><span id="support-count">{{ smsgs|length }}</span> message<span id="support-count-s">{% if smsgs|length > 1 %}s{% endif %}</span></span>
   </div>
 
   <div class="chat-log" id="chat-log">
@@ -93,5 +93,84 @@
 <script>
   var log = document.getElementById('chat-log');
   if (log) log.scrollTop = log.scrollHeight;
+
+  var supportLog = document.getElementById('chat-log');
+  var supportCountEl = document.getElementById('support-count');
+  var supportCountS = document.getElementById('support-count-s');
+  if (supportLog) {
+    var supportPollUrl = '{% url 'communities:support_poll' community.slug thread.pk %}';
+    var lastSupportPk = {{ last_support_pk }};
+    var supportEmptyHint = document.querySelector('.chat-empty');
+
+    function supEl(tag, cls) {
+      var n = document.createElement(tag);
+      if (cls) n.className = cls;
+      return n;
+    }
+    function supAdd(m) {
+      var wrap = supEl('div', 'chat-msg');
+      wrap.id = 'smsg-' + m.pk;
+      var av = supEl('div', 'chat-avatar' + (m.is_guest ? ' guest' : m.is_admin ? ' admin' : ''));
+      av.textContent = (m.author || '?').slice(0, 1).toUpperCase();
+      var body = supEl('div', 'chat-body');
+      var meta = supEl('div', 'chat-meta');
+      var au = supEl('span', 'chat-author' + (m.is_guest ? ' guest' : ''));
+      au.textContent = m.author;
+      var tm = supEl('span', 'muted time');
+      tm.textContent = supTimesince(m.time);
+      meta.appendChild(au);
+      meta.appendChild(tm);
+      var tx = supEl('div', 'chat-text');
+      (m.text || '').split('\n').forEach(function (line, i) {
+        if (i > 0) tx.appendChild(document.createElement('br'));
+        tx.appendChild(document.createTextNode(line));
+      });
+      body.appendChild(meta);
+      body.appendChild(tx);
+      wrap.appendChild(av);
+      wrap.appendChild(body);
+      supportLog.appendChild(wrap);
+      supportLog.scrollTop = supportLog.scrollHeight;
+    }
+    function supTimesince(iso) {
+      var d = new Date(iso);
+      if (isNaN(d.getTime())) return '';
+      var s = Math.floor((Date.now() - d.getTime()) / 1000);
+      if (s < 10) return 'à l\'instant';
+      if (s < 60) return 'il y a ' + s + ' s';
+      var mn = Math.floor(s / 60);
+      if (mn < 60) return 'il y a ' + mn + ' min';
+      var h = Math.floor(mn / 60);
+      if (h < 24) return 'il y a ' + h + ' h';
+      return 'il y a ' + Math.floor(h / 24) + ' j';
+    }
+    function pollSupport() {
+      fetch(supportPollUrl + '?after=' + lastSupportPk, { credentials: 'same-origin' })
+        .then(function (r) { if (!r.ok) throw new Error('bad'); return r.json(); })
+        .then(function (data) {
+          if (!data) return;
+          if (data.status !== 'open') { window.location.reload(); return; }
+          if (data.messages && data.messages.length) {
+            if (supportEmptyHint && supportEmptyHint.parentNode) {
+              supportEmptyHint.parentNode.removeChild(supportEmptyHint);
+              supportEmptyHint = null;
+            }
+            var last = lastSupportPk;
+            data.messages.forEach(function (m) {
+              if (m.pk > last) last = m.pk;
+              supAdd(m);
+            });
+            lastSupportPk = last;
+          }
+          if (typeof data.count === 'number' && supportCountEl) {
+            supportCountEl.textContent = data.count;
+            if (supportCountS) supportCountS.textContent = data.count > 1 ? 's' : '';
+          }
+        })
+        .catch(function () {});
+    }
+    pollSupport();
+    setInterval(pollSupport, 4000);
+  }
 </script>
 {% endblock %}
