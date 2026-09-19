@@ -16,6 +16,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.cache import never_cache
+from django.views.decorators.http import require_GET
 
 from .forms import (CommunityEditForm, CommunityForm, MessageForm, SubAdminRightsForm,
                     SupportReplyForm, SupportStartForm)
@@ -77,9 +78,9 @@ def community_detail(request, slug):
     perms = perms_for(user, community)
     membership = community.user_membership(user)
     messages_qs = community.messages.select_related('author')[:200]
-    members = community.memberships.select_related('user').order_by(
-        '-role', 'joined_at'
-    )
+    members = community.memberships.select_related('user').filter(
+        user__is_banned=False
+    ).order_by('-role', 'joined_at')
 
     active_call = community.calls.first()
     is_registered = user.is_authenticated and not user.is_guest
@@ -92,6 +93,7 @@ def community_detail(request, slug):
         'membership': membership,
         'role': community.user_role(user),
         'chat_messages': messages_qs,
+        'last_chat_pk': max((m.pk for m in messages_qs), default=0),
         'members': members,
         'message_form': MessageForm() if perms['is_member'] else None,
         'active_call': active_call,
@@ -303,6 +305,53 @@ def post_message(request, slug):
             form.save()
         return redirect('communities:detail', slug=community.slug)
     return redirect('communities:detail', slug=community.slug)
+
+
+@never_cache
+@require_GET
+def chat_poll(request, slug):
+    """Point d'accès JSON du chat temps réel : nouveaux messages + présences.
+
+    Le client interroge ce point toutes les quelques secondes avec ?after=<pk>.
+    """
+    community = get_object_or_404(Community, slug=slug)
+    user = request.user
+    if not (user.is_authenticated and can_access(user, community)):
+        return JsonResponse({'error': 'Accès refusé.'}, status=403)
+    try:
+        after = max(0, int(request.GET.get('after', 0)))
+    except (TypeError, ValueError):
+        after = 0
+    new_messages = (
+        community.messages
+        .filter(pk__gt=after)
+        .select_related('author')
+        .order_by('pk')[:50]
+    )
+    messages = [
+        {
+            'pk': m.pk,
+            'author': m.author.username if m.author else 'Utilisateur supprimé',
+            'is_guest': bool(m.author and m.author.is_guest),
+            'is_admin': bool(m.author and m.author.is_site_admin),
+            'mine': bool(m.author and m.author_id == user.pk),
+            'text': m.text,
+            'time': timezone.localtime(m.created_at).isoformat(),
+        }
+        for m in new_messages
+    ]
+    online = [
+        mb.user.username
+        for mb in community.memberships
+        .exclude(user__is_banned=True)
+        .select_related('user')
+        if mb.user.is_online
+    ]
+    return JsonResponse({
+        'messages': messages,
+        'online': online,
+        'count': community.messages.count(),
+    })
 
 
 @login_required

@@ -14,6 +14,7 @@ urlpatterns = [
     path('communaute/<slug:slug>/rejoindre/', views.join_community, name='join'),
     path('communaute/<slug:slug>/quitter/', views.leave_community, name='leave'),
     path('communaute/<slug:slug>/message/', views.post_message, name='post_message'),
+    path('communaute/<slug:slug>/messages/', views.chat_poll, name='chat_poll'),
     path('communaute/<slug:slug>/message/<int:pk>/supprimer/', views.delete_message, name='delete_message'),
 
     path('communaute/<slug:slug>/aide/', views.support_start, name='support_start'),

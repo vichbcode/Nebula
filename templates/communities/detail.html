@@ -227,7 +227,7 @@
   <section class="card chat-card">
     <div class="card-headline">
       <h3 class="card-title">Discussion</h3>
-      <span class="muted">{{ chat_messages|length }} message{% if chat_messages|length > 1 %}s{% endif %}</span>
+      <span class="muted"><span id="chat-count">{{ chat_messages|length }}</span> message<span id="chat-count-s">{% if chat_messages|length > 1 %}s{% endif %}</span></span>
     </div>
 
     <div class="chat-log" id="chat-log">
@@ -281,7 +281,7 @@
     </div>
     <ul class="member-list">
       {% for member in members %}
-        <li class="member-row">
+        <li class="member-row" data-user="{{ member.user.username }}">
           <div class="chat-avatar {% if member.user.is_guest %}guest{% elif member.user.is_site_admin %}admin{% elif member.role == 'sub_admin' %}subadmin{% endif %}">
             {{ member.user.username|slice:":1"|upper }}
           </div>
@@ -1017,5 +1017,101 @@
 
   var log = document.getElementById('chat-log');
   if (log) log.scrollTop = log.scrollHeight;
+
+  // --- Chat temps réel : nouveaux messages + présences en ligne ---------
+  var chatLog = document.getElementById('chat-log');
+  var chatCountEl = document.getElementById('chat-count');
+  var chatCountS = document.getElementById('chat-count-s');
+  if (chatLog) {
+    var chatPollUrl = '{% url 'communities:chat_poll' community.slug %}';
+    var lastChatPk = {{ last_chat_pk }};
+    var chatEmptyHint = document.querySelector('.chat-empty');
+
+    function mkEl(tag, cls) {
+      var n = document.createElement(tag);
+      if (cls) n.className = cls;
+      return n;
+    }
+    function addChatMessage(m) {
+      var wrap = mkEl('div', 'chat-msg');
+      wrap.id = 'msg-' + m.pk;
+      var av = mkEl('div', 'chat-avatar' + (m.is_guest ? ' guest' : m.is_admin ? ' admin' : ''));
+      av.textContent = (m.author || '?').slice(0, 1).toUpperCase();
+      var body = mkEl('div', 'chat-body');
+      var meta = mkEl('div', 'chat-meta');
+      var au = mkEl('span', 'chat-author' + (m.is_guest ? ' guest' : ''));
+      au.textContent = m.author;
+      var tm = mkEl('span', 'muted time');
+      tm.textContent = timesinceAgo(m.time);
+      meta.appendChild(au);
+      meta.appendChild(tm);
+      var tx = mkEl('div', 'chat-text');
+      (m.text || '').split('\n').forEach(function (line, i) {
+        if (i > 0) tx.appendChild(document.createElement('br'));
+        tx.appendChild(document.createTextNode(line));
+      });
+      body.appendChild(meta);
+      body.appendChild(tx);
+      wrap.appendChild(av);
+      wrap.appendChild(body);
+      chatLog.appendChild(wrap);
+      chatLog.scrollTop = chatLog.scrollHeight;
+    }
+    function timesinceAgo(iso) {
+      var d = new Date(iso);
+      if (isNaN(d.getTime())) return '';
+      var s = Math.floor((Date.now() - d.getTime()) / 1000);
+      if (s < 10) return 'à l\'instant';
+      if (s < 60) return 'il y a ' + s + ' s';
+      var mn = Math.floor(s / 60);
+      if (mn < 60) return 'il y a ' + mn + ' min';
+      var h = Math.floor(mn / 60);
+      if (h < 24) return 'il y a ' + h + ' h';
+      return 'il y a ' + Math.floor(h / 24) + ' j';
+    }
+    function refreshPresence(onlineUsers) {
+      var rows = document.querySelectorAll('.member-row[data-user]');
+      var set = {};
+      onlineUsers.forEach(function (u) { set[u] = true; });
+      Array.prototype.forEach.call(rows, function (row) {
+        var has = set[row.getAttribute('data-user')] === true;
+        var dot = row.querySelector('.online-dot');
+        if (has && !dot) {
+          var d = mkEl('span', 'online-dot');
+          d.title = 'En ligne';
+          row.appendChild(d);
+        } else if (!has && dot) {
+          dot.parentNode.removeChild(dot);
+        }
+      });
+    }
+    function pollChat() {
+      fetch(chatPollUrl + '?after=' + lastChatPk, { credentials: 'same-origin' })
+        .then(function (r) { if (!r.ok) throw new Error('bad'); return r.json(); })
+        .then(function (data) {
+          if (!data) return;
+          if (data.messages && data.messages.length) {
+            if (chatEmptyHint && chatEmptyHint.parentNode) {
+              chatEmptyHint.parentNode.removeChild(chatEmptyHint);
+              chatEmptyHint = null;
+            }
+            var last = lastChatPk;
+            data.messages.forEach(function (m) {
+              if (m.pk > last) last = m.pk;
+              addChatMessage(m);
+            });
+            lastChatPk = last;
+          }
+          if (typeof data.count === 'number' && chatCountEl) {
+            chatCountEl.textContent = data.count;
+            if (chatCountS) chatCountS.textContent = data.count > 1 ? 's' : '';
+          }
+          if (data.online) refreshPresence(data.online);
+        })
+        .catch(function () {});
+    }
+    pollChat();
+    setInterval(pollChat, 5000);
+  }
 </script>
 {% endblock %}

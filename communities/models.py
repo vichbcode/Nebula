@@ -68,7 +68,7 @@ class Community(models.Model):
         return Membership.objects.filter(user=user, community=self).first()
 
     def member_count(self):
-        return self.memberships.count()
+        return self.memberships.exclude(user__is_banned=True).count()
 
     def __str__(self):
         return self.name

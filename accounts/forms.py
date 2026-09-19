@@ -75,6 +75,12 @@ class LoginForm(StyledFormMixin, AuthenticationForm):
             raise ValidationError(
                 'Ce pseudo correspond à un compte invité. Utilise l’onglet « Invité ».'
             )
+        if not User.objects.filter(username=username, is_guest=False).exists():
+            match = (User.objects.filter(username__iexact=username, is_guest=False)
+                     .only('username').first())
+            if match:
+                username = match.username
+        self.cleaned_data['username'] = username
         return username
 
     def confirm_login_allowed(self, user):

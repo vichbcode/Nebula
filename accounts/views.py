@@ -119,6 +119,8 @@ def logout_view(request):
         user.delete()
         messages.info(request, 'À bientôt ! Ton compte invité a été supprimé.')
     else:
+        if user.is_authenticated:
+            User.objects.filter(pk=user.pk).update(last_seen=None)
         logout(request)
         messages.info(request, 'Tu es bien déconnecté.')
     return redirect('communities:index')
