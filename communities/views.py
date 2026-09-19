@@ -356,11 +356,23 @@ def chat_poll(request, slug):
 
 @login_required
 def delete_message(request, slug, pk):
-    message_obj = get_object_or_404(Message, pk=pk, community__slug=slug)
+    message_obj = get_object_or_404(
+        Message.objects.select_related('author'), pk=pk, community__slug=slug)
     perms = perms_for(request.user, message_obj.community)
-    if request.method == 'POST' and (perms['moderate'] or message_obj.author == request.user):
+    author_is_other_admin = (
+        message_obj.author is not None
+        and message_obj.author.is_site_admin
+        and message_obj.author_id != request.user.pk
+    )
+    can_delete = (
+        (perms['moderate'] or message_obj.author == request.user)
+        and not author_is_other_admin
+    )
+    if request.method == 'POST' and can_delete:
         message_obj.delete()
         messages.success(request, 'Message supprimé.')
+    elif request.method == 'POST':
+        messages.error(request, 'Tu ne peux pas supprimer le message d’un autre administrateur.')
     return redirect('communities:detail', slug=slug)
 
 

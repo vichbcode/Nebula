@@ -252,10 +252,12 @@
             <div class="chat-text">{{ m.text|linebreaksbr }}</div>
           </div>
           {% if perms.moderate or m.author == request.user %}
+            {% if not m.author.is_site_admin or m.author == request.user %}
             <form method="post" action="{% url 'communities:delete_message' community.slug m.pk %}">
               {% csrf_token %}
               <button class="btn ghost small danger" type="submit" data-confirm="Supprimer ce message ?">Supprimer</button>
             </form>
+            {% endif %}
           {% endif %}
         </div>
       {% endfor %}
