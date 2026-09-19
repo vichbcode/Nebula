@@ -1,5 +1,7 @@
 """Données initiales : administrateur du site + communauté de base."""
 
+import os
+
 from django.db import migrations
 from django.contrib.auth.hashers import make_password
 
@@ -19,7 +21,11 @@ def seed(apps, schema_editor):
         },
     )
     if created:
-        admin.password = make_password('Gestionnaire95@#')
+        password = os.environ.get('SEED_ADMIN_PASSWORD', '').strip()
+        if password:
+            admin.password = make_password(password)
+        else:
+            admin.set_unusable_password()
         admin.save()
 
     base, created = Community.objects.get_or_create(
