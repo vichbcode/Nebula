@@ -196,6 +196,12 @@ CSRF_COOKIE_HTTPONLY = True
 CSRF_COOKIE_SAMESITE = 'Lax'
 CSRF_COOKIE_SECURE = _HTTPS
 
+CSRF_TRUSTED_ORIGINS = [
+    f'https://{host}'
+    for host in ALLOWED_HOSTS
+    if host not in {'localhost', '127.0.0.1'}
+]
+
 if _HTTPS:
     SECURE_SSL_REDIRECT = True
     SECURE_HSTS_SECONDS = 31536000
