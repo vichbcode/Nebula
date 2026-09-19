@@ -32,7 +32,9 @@ def access_token(call, user, identity):
         settings.LIVEKIT_API_SECRET,
     )
     grant = api.VideoGrants(room_join=True, room=room_name_for(call))
-    return token.with_identity(identity).with_ttl(timedelta(seconds=60)).with_grants(grant).to_jwt()
+    name = getattr(user, 'username', None) or identity
+    return (token.with_identity(identity).with_name(name)
+            .with_ttl(timedelta(seconds=60)).with_grants(grant).to_jwt())
 
 
 def close_room(call):

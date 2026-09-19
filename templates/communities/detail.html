@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block title %}{{ community.name }} — {{ SITE_NAME }}{% endblock %}
 
@@ -368,6 +369,7 @@
 {% endblock %}
 
 {% block extra_scripts %}
+<script src="{% static 'livekit/livekit-client.umd.min.js' %}"></script>
 <script>
   var slug = '{{ community.slug|escapejs }}';
   var uid = '{{ request.user.username|escapejs }}';
@@ -375,6 +377,8 @@
   var videoMode = {% if active_call and active_call.call_type == 'video' %}true{% else %}false{% endif %};
   var callIsStarter = {% if call_is_starter %}true{% else %}false{% endif %};
   var signalUrl = {% if active_call %}'{% url 'communities:call_signal' community.slug active_call.pk %}'{% else %}''{% endif %};
+  var jetonUrl = {% if active_call %}'{% url 'communities:livekit_token' community.slug active_call.pk %}'{% else %}''{% endif %};
+  var livekitService = {% if livekit_service %}true{% else %}false{% endif %};
   var turnUrl = '{% url 'communities:turn_credentials' %}';
   var csrfToken = '{{ csrf_token }}';
   var callModal = document.getElementById('call-modal');
@@ -416,6 +420,9 @@
   var camOn = true;
   var pollTimer = null;
   var inCall = false;
+  var useLiveKit = false;   // actif quand la connexion se fait via le SFU LiveKit
+  var lkRoom = null;        // instance LivekitClient.Room
+  var lkBoxes = {};         // identity -> {box, videoEl, audioEl, nameEl}
 
   function getToken() {
     if (csrfToken) return csrfToken;
@@ -460,6 +467,7 @@
   function callEnded() {
     stopPolling();
     inCall = false;
+    if (useLiveKit) { disconnectLiveKit(); }
     Object.keys(peers).forEach(function (p) { removePeer(p); });
     if (localStream) {
       localStream.getTracks().forEach(function (t) { t.stop(); });
@@ -612,7 +620,7 @@
 
   function resumeRemoteAudio() {
     if (!callGrid) return;
-    callGrid.querySelectorAll('video, .lk-video').forEach(function (v) {
+    callGrid.querySelectorAll('video, audio, .lk-video').forEach(function (v) {
       if (!v.srcObject) return;
       v.muted = false;
       var p = v.play();
@@ -644,7 +652,11 @@
     callModal.classList.add('open');
     var bar = document.getElementById('call-bar');
     if (bar) bar.style.display = 'none';
-    openP2P();
+    if (livekitService && jetonUrl && window.LivekitClient) {
+      startLiveKit();
+    } else {
+      openP2P();
+    }
   }
 
   function openP2P() {
@@ -692,17 +704,179 @@
     });
   }
 
+  function playElem(el) {
+    if (!el) return;
+    var p = el.play();
+    if (p && p.catch) p.catch(function () {});
+  }
+
+  function lkName(participant) {
+    var nm = participant ? participant.displayName : null;
+    if (nm && typeof nm !== 'function') return nm;
+    if (nm && typeof nm === 'function') return nm();
+    return (participant && participant.identity) || 'Participant';
+  }
+
+  function lkPublications(participant) {
+    if (participant.trackPublications) return participant.trackPublications;
+    if (participant.trackPublicationMap) return participant.trackPublicationMap;
+    return [];
+  }
+
+  function lkEnsureBox(identity) {
+    if (lkBoxes[identity]) return lkBoxes[identity];
+    var box = document.createElement('div');
+    box.className = 'call-peer';
+    box.id = 'peer-' + identity;
+    var v = document.createElement('video');
+    v.autoplay = true;
+    v.playsInline = true;
+    box.appendChild(v);
+    var a = document.createElement('audio');
+    a.autoplay = true;
+    box.appendChild(a);
+    var lbl = document.createElement('span');
+    lbl.className = 'call-name';
+    lbl.textContent = 'Participant';
+    box.appendChild(lbl);
+    callGrid.appendChild(box);
+    var u = { box: box, videoEl: v, audioEl: a, nameEl: lbl };
+    lkBoxes[identity] = u;
+    return u;
+  }
+
+  function lkAttachTrack(track, pub, participant) {
+    if (!track || !participant || participant.isLocal || !pub) return;
+    var u = lkEnsureBox(participant.identity);
+    u.nameEl.textContent = lkName(participant);
+    if (pub.kind === 'video' && track.attach) {
+      if (!u.videoEl.srcObject) track.attach(u.videoEl);
+      playElem(u.videoEl);
+    } else if (pub.kind === 'audio' && track.attach) {
+      if (!u.audioEl.srcObject) track.attach(u.audioEl);
+      playElem(u.audioEl);
+    }
+  }
+
+  function lkDetachTrack(track, pub, participant) {
+    if (!participant || participant.isLocal) return;
+    var u = lkBoxes[participant.identity];
+    if (!u) return;
+    if (pub && pub.kind === 'video') { u.videoEl.srcObject = null; }
+    if (pub && pub.kind === 'audio') { u.audioEl.srcObject = null; }
+  }
+
+  function lkOnParticipant(participant) {
+    if (!participant || participant.isLocal) return;
+    var u = lkEnsureBox(participant.identity);
+    u.nameEl.textContent = lkName(participant);
+    lkPublications(participant).forEach(function (pub) {
+      if (pub.track && pub.track.isSubscribed) lkAttachTrack(pub.track, pub, participant);
+    });
+  }
+
+  function lkOnParticipantDisconnected(participant) {
+    var u = lkBoxes[participant.identity];
+    if (u && u.box) u.box.remove();
+    delete lkBoxes[participant.identity];
+  }
+
+  function lkOnTrackPublished(pub, participant) {
+    if (!pub || !pub.track || !participant || !participant.isLocal) return;
+    var el = callModal ? callModal.querySelector('#call-local') : null;
+    if (el && pub.track.attach && !el.srcObject) pub.track.attach(el);
+    playElem(el);
+  }
+
+  function wireLiveKit(room) {
+    room.on(LivekitClient.RoomEvent.ParticipantConnected, lkOnParticipant);
+    room.on(LivekitClient.RoomEvent.ParticipantDisconnected, lkOnParticipantDisconnected);
+    room.on(LivekitClient.RoomEvent.TrackSubscribed, lkAttachTrack);
+    room.on(LivekitClient.RoomEvent.TrackUnsubscribed, lkDetachTrack);
+    room.on(LivekitClient.RoomEvent.TrackPublished, lkOnTrackPublished);
+    room.on(LivekitClient.RoomEvent.Disconnected, function () {
+      lkRoom = null;
+      useLiveKit = false;
+      lkBoxes = {};
+    });
+    room.remoteParticipants.forEach(lkOnParticipant);
+  }
+
+  function enableLiveKitMedia() {
+    var steps = [];
+    if (videoMode !== false) {
+      steps.push(lkRoom.localParticipant.setCameraEnabled(true).catch(function () {
+        videoMode = false;
+        camOn = false;
+        if (camBtn) camBtn.classList.add('off');
+        refreshError(true);
+      }));
+    }
+    steps.push(lkRoom.localParticipant.setMicrophoneEnabled(true).catch(function () {
+      refreshError(true);
+    }));
+    return Promise.all(steps);
+  }
+
+  function disconnectLiveKit() {
+    if (lkRoom) { try { lkRoom.disconnect(); } catch (e) {} }
+    lkRoom = null;
+    useLiveKit = false;
+    Object.keys(lkBoxes).forEach(function (k) { if (lkBoxes[k].box) lkBoxes[k].box.remove(); });
+    lkBoxes = {};
+    var base = callModal ? callModal.querySelector('#call-local') : null;
+    if (base) { base.srcObject = null; base.removeAttribute('src'); }
+  }
+
+  function startLiveKit() {
+    startPolling();
+    fetch(jetonUrl, { credentials: 'same-origin' })
+      .then(function (r) {
+        if (r.status === 503) { useLiveKit = false; lkRoom = null; openP2P(); return null; }
+        if (!r.ok) {
+          useLiveKit = false;
+          refreshError(true);
+          inCall = false;
+          closeCallUi();
+          return null;
+        }
+        return r.json();
+      })
+      .then(function (j) {
+        if (!j) return null;
+        var room = new LivekitClient.Room();
+        lkRoom = room;
+        useLiveKit = true;
+        wireLiveKit(room);
+        return room.connect(j.url, j.token, { autoSubscribe: true });
+      })
+      .then(function () {
+        if (useLiveKit && lkRoom) return enableLiveKitMedia();
+        return null;
+      })
+      .catch(function () {
+        if (useLiveKit) disconnectLiveKit();
+        refreshError(true);
+        inCall = false;
+        closeCallUi();
+      });
+  }
+
   function closeCall() {
     inCall = false;
     stopPolling();
-    postSignal('bye', '', '');
-    Object.keys(peers).forEach(function (p) { removePeer(p); });
-    if (localStream) {
-      localStream.getTracks().forEach(function (t) { t.stop(); });
-      localStream = null;
+    if (useLiveKit) {
+      disconnectLiveKit();
+    } else {
+      postSignal('bye', '', '');
+      Object.keys(peers).forEach(function (p) { removePeer(p); });
+      if (localStream) {
+        localStream.getTracks().forEach(function (t) { t.stop(); });
+        localStream = null;
+      }
+      var base = callModal ? callModal.querySelector('#call-local') : null;
+      if (base) { base.srcObject = null; base.removeAttribute('src'); }
     }
-    var base = callModal ? callModal.querySelector('#call-local') : null;
-    if (base) { base.srcObject = null; base.removeAttribute('src'); }
   }
 
   function closeCallUi() {
@@ -720,7 +894,9 @@
   var micBtn = document.getElementById('call-mic');
   if (micBtn) micBtn.addEventListener('click', function () {
     micOn = !micOn;
-    if (localStream) {
+    if (useLiveKit && lkRoom) {
+      lkRoom.localParticipant.setMicrophoneEnabled(micOn).catch(function () {});
+    } else if (localStream) {
       localStream.getAudioTracks().forEach(function (t) { t.enabled = micOn; });
     }
     micBtn.classList.toggle('off', !micOn);
@@ -729,7 +905,9 @@
   var camBtn = document.getElementById('call-cam');
   if (camBtn) camBtn.addEventListener('click', function () {
     camOn = !camOn;
-    if (localStream) {
+    if (useLiveKit && lkRoom) {
+      lkRoom.localParticipant.setCameraEnabled(camOn).catch(function () {});
+    } else if (localStream) {
       localStream.getVideoTracks().forEach(function (t) { t.enabled = camOn; });
     }
     camBtn.classList.toggle('off', !camOn);
@@ -749,6 +927,18 @@
   window.addEventListener('pagehide', function () {
     if (!inCall) return;
     stopPolling();
+    if (useLiveKit) {
+      try { lkRoom && lkRoom.disconnect(); } catch (e) {}
+      lkRoom = null;
+      useLiveKit = false;
+      // LiveKit : l'initiateur ferme l'appel (dispatchée sur le serveur,
+      // qui supprime aussi le salon LiveKit).
+      if (callIsStarter && endCallForm) {
+        var fd2 = new FormData(endCallForm);
+        navigator.sendBeacon(endCallForm.action, fd2);
+      }
+      return;
+    }
     if (callIsStarter && endCallForm) {
       // P2P : l'admin ferme l'appel pour tout le monde.
       var fd = new FormData(endCallForm);

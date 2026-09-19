@@ -100,6 +100,8 @@ def community_detail(request, slug):
             active_call and user.is_authenticated
             and active_call.started_by_id == user.pk
         ),
+        # LiveKit (SFU) disponible si configuré ; sinon repli pair-à-pair maison.
+        'livekit_service': is_enabled(),
     }
 
     if community.is_support and user.is_authenticated:
