@@ -16,6 +16,9 @@ venv/
 # Vercel
 .vercel/
 
+# Sauvegarde/migration de base
+nebula.sql
+
 # IDE
 .idea/
 .vscode/
