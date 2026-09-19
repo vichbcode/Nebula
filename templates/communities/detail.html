@@ -627,17 +627,6 @@
     callModal.classList.add('open');
     var bar = document.getElementById('call-bar');
     if (bar) bar.style.display = 'none';
-    if (!callModal || inCall) return;
-    inCall = true;
-    micOn = true;
-    camOn = true;
-    if (micBtn) micBtn.classList.remove('off');
-    if (camBtn) camBtn.classList.remove('off');
-    callGrid.innerHTML = '';
-    refreshError(false);
-    callModal.classList.add('open');
-    var bar = document.getElementById('call-bar');
-    if (bar) bar.style.display = 'none';
     openP2P();
   }
 

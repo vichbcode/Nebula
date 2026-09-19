@@ -18,6 +18,7 @@ venv/
 
 # Sauvegarde/migration de base
 nebula.sql
+nebula_raw.sql
 
 # IDE
 .idea/
