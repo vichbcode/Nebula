@@ -604,8 +604,25 @@
     var video = box.querySelector('video') || (streamOrEl instanceof HTMLElement ? streamOrEl : null);
     if (video && !(streamOrEl instanceof HTMLElement) && !video.srcObject) {
       video.srcObject = streamOrEl;
+      video.muted = false;
+      var p = video.play();
+      if (p && p.catch) p.catch(function () {});
     }
   }
+
+  function resumeRemoteAudio() {
+    if (!callGrid) return;
+    callGrid.querySelectorAll('video, .lk-video').forEach(function (v) {
+      if (!v.srcObject) return;
+      v.muted = false;
+      var p = v.play();
+      if (p && p.catch) p.catch(function () {});
+    });
+  }
+
+  ['pointerdown', 'keydown', 'touchstart'].forEach(function (evName) {
+    document.addEventListener(evName, function () { setTimeout(resumeRemoteAudio, 0); });
+  });
 
   function removePeer(peerId) {
     var pc = peers[peerId];
