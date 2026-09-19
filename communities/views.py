@@ -84,7 +84,8 @@ def community_detail(request, slug):
     active_call = community.calls.first()
     is_registered = user.is_authenticated and not user.is_guest
     if active_call:
-        print(f'[CALL] PAGE user={getattr(user, "username", "anonyme")} call={active_call.pk} starter={active_call.started_by_id}', flush=True)
+        mode = 'livekit' if is_enabled() else 'p2p'
+        print(f'[CALL] PAGE user={getattr(user, "username", "anonyme")} call={active_call.pk} starter={active_call.started_by_id} mode={mode}', flush=True)
     context = {
         'community': community,
         'perms': perms,
@@ -466,6 +467,7 @@ def livekit_token(request, slug, call_pk):
         return JsonResponse({'error': 'Accès refusé à l\'appel.'}, status=403)
     identity = f'{community.slug}-{user.pk}'
     room = f'{community.slug}-{call.pk}'
+    print(f'[CALL] LIVEKIT token user={user.username} call={call.pk} room={room}', flush=True)
     return JsonResponse({
         'url': settings.LIVEKIT_URL,
         'token': access_token(call, user, identity),

@@ -653,8 +653,10 @@
     var bar = document.getElementById('call-bar');
     if (bar) bar.style.display = 'none';
     if (livekitService && jetonUrl && window.LivekitClient) {
+      console.log('[NEBULA] mode appel : LiveKit (SFU)');
       startLiveKit();
     } else {
+      console.log('[NEBULA] mode appel : P2P maison');
       openP2P();
     }
   }
@@ -755,6 +757,8 @@
     } else if (pub.kind === 'audio' && track.attach) {
       if (!u.audioEl.srcObject) track.attach(u.audioEl);
       playElem(u.audioEl);
+      setTimeout(function () { playElem(u.audioEl); }, 400);
+      console.log('[NEBULA] audio distant abonné :', participant.identity);
     }
   }
 
@@ -805,16 +809,30 @@
   function enableLiveKitMedia() {
     var steps = [];
     if (videoMode !== false) {
-      steps.push(lkRoom.localParticipant.setCameraEnabled(true).catch(function () {
+      var camP = lkRoom.localParticipant.setCameraEnabled(true).then(function (pub) {
+        // Aperçu local : on attache dès le retour (déterministe, pas seulement
+        // via l'événement TrackPublished).
+        var el = callModal ? callModal.querySelector('#call-local') : null;
+        if (el && pub && pub.track && pub.track.attach && !el.srcObject) {
+          pub.track.attach(el);
+          playElem(el);
+        }
+        return pub;
+      }).catch(function () {
         videoMode = false;
         camOn = false;
         if (camBtn) camBtn.classList.add('off');
         refreshError(true);
-      }));
+      });
+      steps.push(camP);
     }
-    steps.push(lkRoom.localParticipant.setMicrophoneEnabled(true).catch(function () {
+    var micP = lkRoom.localParticipant.setMicrophoneEnabled(true).then(function (pub) {
+      console.log('[NEBULA] micro LiveKit publié :', !!pub && !!pub.track);
+    }).catch(function () {
+      console.warn('[NEBULA] micro LiveKit refusé');
       refreshError(true);
-    }));
+    });
+    steps.push(micP);
     return Promise.all(steps);
   }
 
