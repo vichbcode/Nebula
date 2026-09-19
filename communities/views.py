@@ -103,6 +103,12 @@ def community_detail(request, slug):
         ),
         # LiveKit (SFU) disponible si configuré ; sinon repli pair-à-pair maison.
         'livekit_service': is_enabled(),
+        # identity LiveKit -> pseudo, pour afficher le vrai nom dans les appels.
+        'call_name_map': {
+            f'{community.slug}-{m.user.pk}': m.user.username
+            for m in members
+            if m.user and not m.user.is_guest
+        },
     }
 
     if community.is_support and user.is_authenticated:

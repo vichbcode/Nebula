@@ -369,6 +369,7 @@
 {% endblock %}
 
 {% block extra_scripts %}
+{{ call_name_map|json_script:'lk-names' }}
 <script src="{% static 'livekit/livekit-client.umd.min.js' %}"></script>
 <script>
   var slug = '{{ community.slug|escapejs }}';
@@ -379,6 +380,11 @@
   var signalUrl = {% if active_call %}'{% url 'communities:call_signal' community.slug active_call.pk %}'{% else %}''{% endif %};
   var jetonUrl = {% if active_call %}'{% url 'communities:livekit_token' community.slug active_call.pk %}'{% else %}''{% endif %};
   var livekitService = {% if livekit_service %}true{% else %}false{% endif %};
+  var nameMap = {};
+  try {
+    var _nm = document.getElementById('lk-names');
+    if (_nm) nameMap = JSON.parse(_nm.textContent || '{}');
+  } catch (e) {}
   var turnUrl = '{% url 'communities:turn_credentials' %}';
   var csrfToken = '{{ csrf_token }}';
   var callModal = document.getElementById('call-modal');
@@ -713,10 +719,12 @@
   }
 
   function lkName(participant) {
+    var id = participant ? participant.identity : null;
+    if (id && nameMap[id]) return nameMap[id];
     var nm = participant ? participant.displayName : null;
     if (nm && typeof nm !== 'function') return nm;
     if (nm && typeof nm === 'function') return nm();
-    return (participant && participant.identity) || 'Participant';
+    return id || 'Participant';
   }
 
   function lkPublications(participant) {
