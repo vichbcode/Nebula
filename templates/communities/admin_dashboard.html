@@ -1,0 +1,72 @@
+{% extends 'base.html' %}
+
+{% block title %}Espace Admin — {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <h1 class="page-title">Espace Administrateur</h1>
+  <p class="page-sub">Vue d'ensemble et gestion du site.</p>
+</div>
+
+<div class="admin-stats">
+  <div class="stat-card">
+    <div class="stat-value">{{ community_count }}</div>
+    <div class="stat-label">Communautés</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value">{{ member_count }}</div>
+    <div class="stat-label">Utilisateurs inscrits</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value">{{ guest_online_count }}</div>
+    <div class="stat-label">Invités en ligne</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-value">{{ total_memberships }}</div>
+    <div class="stat-label">Adhésions totales</div>
+  </div>
+  <div class="stat-card {% if banned_count %}warn{% endif %}">
+    <div class="stat-value">{{ banned_count }}</div>
+    <div class="stat-label">Comptes bannis</div>
+  </div>
+</div>
+
+<div class="grid-2 admin-links">
+  <a class="card admin-link" href="{% url 'communities:admin_community_create' %}">
+    <h3>Créer une communauté</h3>
+    <p class="muted">Nom, description, accès invités, appel.</p>
+  </a>
+  <a class="card admin-link" href="{% url 'communities:admin_users' %}">
+    <h3>Utilisateurs inscrits</h3>
+    <p class="muted">{{ member_count }} comptes. Bannir, débloquer, gérer.</p>
+  </a>
+  <a class="card admin-link" href="{% url 'communities:admin_guests' %}">
+    <h3>Comptes invités en ligne</h3>
+    <p class="muted">{{ guest_online_count }} connectés. Bannir ou supprimer.</p>
+  </a>
+  <a class="card admin-link" href="{% url 'communities:admin_admins' %}">
+    <h3>Administrateurs</h3>
+    <p class="muted">{{ admins|length }}/4 postes. Nommer, révoquer.</p>
+  </a>
+</div>
+
+<div class="card">
+  <h3 class="card-title">Communautés existantes</h3>
+  <ul class="admin-list">
+    {% for c in communities %}
+      <li class="admin-row">
+        <span class="community-badge small">{{ c.name|slice:":1" }}</span>
+        <div class="member-info">
+          <span class="chat-author">{{ c.name }}</span>
+          <span class="muted">
+            {% if c.guests_allowed %}Invités ✓{% else %}Privée{% endif %} · {{ c.member_count }} membre(s)
+          </span>
+        </div>
+        <a class="btn ghost small" href="{% url 'communities:manage' c.slug %}">Gérer</a>
+      </li>
+    {% empty %}
+      <li class="muted">Aucune communauté.</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endblock %}

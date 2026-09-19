@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ title }} — {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <h1 class="page-title">{{ title }}</h1>
+  <p class="page-sub">Configure ta communauté : nom, description, accès invités.</p>
+</div>
+
+<div class="card narrow-card">
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+
+    <label class="field">
+      <span class="field-label">Nom de la communauté</span>
+      {{ form.name }}
+    </label>
+    {% for error in form.name.errors %}<p class="field-error">{{ error }}</p>{% endfor %}
+
+    <label class="field">
+      <span class="field-label">Description</span>
+      {{ form.description }}
+    </label>
+
+    <div class="setting-row">
+      <div class="setting-label">
+        <strong>Autoriser l'accès aux invités</strong>
+        <span class="muted">Si coché, les comptes invités (#…) peuvent rejoindre cette communauté.</span>
+      </div>
+      <label class="switch-wrap">
+        {{ form.guests_allowed }}
+        <span class="switch-ui"></span>
+      </label>
+    </div>
+
+    <button class="btn primary block" type="submit">{{ submit_label }}</button>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,108 @@
+{% extends 'base.html' %}
+
+{% block title %}Paramètres — {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <h1 class="page-title">Paramètres</h1>
+  <p class="page-sub">Gère ton compte : pseudo, mot de passe, suppression.</p>
+</div>
+
+<div class="card profile-card">
+  <div class="profile-top">
+    <div class="avatar {% if request.user.is_guest %}guest{% elif request.user.is_site_admin %}admin{% endif %}">
+      {{ request.user.username|slice:":1"|upper }}
+    </div>
+    <div class="profile-id">
+      <h2 class="profile-name">{{ request.user.username }}</h2>
+      <div class="role-badges">
+        {% if request.user.is_guest %}
+          <span class="badge guest">Compte invité · éphémère</span>
+        {% elif request.user.is_site_admin %}
+          <span class="badge admin">Administrateur du site</span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {% if request.user.is_guest %}
+    <div class="notice info">
+      Tu es un invité <code>#{{ request.user.username }}</code>. Tu peux changer ton pseudo.
+      Ton compte sera supprimé automatiquement à la déconnexion.
+    </div>
+  {% endif %}
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <h3 class="card-title">
+      Modifier mon pseudo
+    </h3>
+    <form method="post" action="{% url 'accounts:settings' %}" novalidate>
+      {% csrf_token %}
+      <input type="hidden" name="update_username" value="1">
+      <label class="field">
+        <span class="field-label">Nouveau pseudo</span>
+        {{ profile_form.username }}
+      </label>
+      {% for error in profile_form.username.errors %}
+        <p class="field-error">{{ error }}</p>
+      {% endfor %}
+      <button class="btn primary" type="submit">Enregistrer le pseudo</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <h3 class="card-title">
+      Modifier mon mot de passe
+    </h3>
+    {% if request.user.is_guest %}
+      <div class="notice">Les comptes invités n'ont pas de mot de passe.</div>
+    {% else %}
+      <form method="post" action="{% url 'accounts:settings' %}" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="update_password" value="1">
+        <label class="field">
+          <span class="field-label">Mot de passe actuel</span>
+          {{ password_form.old_password }}
+        </label>
+        <label class="field">
+          <span class="field-label">Nouveau mot de passe</span>
+          {{ password_form.new_password1 }}
+        </label>
+        <label class="field">
+          <span class="field-label">Confirmation</span>
+          {{ password_form.new_password2 }}
+        </label>
+        {% if password_form.errors %}
+          <ul class="errorlist">
+            {% for field, errs in password_form.errors.items %}
+              {% for err in errs %}<li>{{ err }}</li>{% endfor %}
+            {% endfor %}
+          </ul>
+        {% endif %}
+        <button class="btn primary" type="submit">Changer le mot de passe</button>
+      </form>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card danger-zone">
+  <h3 class="card-title danger">
+    Zone sensible
+  </h3>
+  {% if request.user.is_guest %}
+    <p class="muted">En tant qu’invité, la déconnexion suffit à supprimer ton compte.</p>
+    <form method="post" action="{% url 'accounts:logout' %}">
+      {% csrf_token %}
+      <button class="btn danger" type="submit">Me déconnecter et supprimer mon compte invité</button>
+    </form>
+  {% else %}
+    <p class="muted">Supprime définitivement ton compte, tes adhésions et tes messages. Action irréversible.</p>
+    <form method="post" action="{% url 'accounts:delete_account' %}">
+      {% csrf_token %}
+      <button class="btn danger" type="submit" data-confirm="Supprimer définitivement ton compte ? Cette action est irréversible.">Supprimer mon compte définitivement</button>
+    </form>
+  {% endif %}
+</div>
+{% endblock %}

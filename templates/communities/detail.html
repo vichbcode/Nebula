@@ -1,0 +1,786 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ community.name }} — {{ SITE_NAME }}{% endblock %}
+
+{% block extra_head %}
+<style>
+  .call-modal {
+    position: fixed; inset: 0; z-index: 60;
+    display: none; flex-direction: column;
+    background: radial-gradient(1000px 600px at 50% 10%, #141a30, #05060d 70%);
+    width: 100vw; height: 100vh; overflow: hidden;
+  }
+  .call-modal.open { display: flex; }
+  .call-grid {
+    flex: 1; width: 100%; overflow: auto;
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(max(240px, 26vw), 1fr));
+    grid-auto-rows: minmax(160px, 32vh);
+    gap: 12px; padding: 70px 14px 90px;
+    align-content: center; align-items: stretch;
+  }
+  .call-grid:empty::before {
+    content: "En attente d'autres participants…";
+    color: rgba(255,255,255,0.45); font-size: 1rem;
+    place-self: center;
+  }
+  .call-peer {
+    position: relative; border-radius: 14px; overflow: hidden;
+    background: #0b1020; min-height: 0;
+    border: 1px solid rgba(255,255,255,0.08);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .call-peer video, .call-peer .lk-video {
+    width: 100%; height: 100%;
+    object-fit: contain;
+    background: #0b1020;
+  }
+  .call-name {
+    position: absolute; left: 8px; bottom: 8px;
+    font-size: 0.72rem; font-weight: 600; color: #fff;
+    background: rgba(0,0,0,0.55); padding: 3px 8px; border-radius: 999px;
+  }
+  .call-local {
+    position: fixed; bottom: 86px; right: 16px; z-index: 62;
+    width: 210px; height: 140px; border-radius: 14px; overflow: hidden;
+    background: #0b1020;
+    border: 2px solid rgba(139,92,246,0.55);
+    box-shadow: 0 12px 30px -10px rgba(0,0,0,0.9);
+  }
+  .call-local video { width: 100%; height: 100%; object-fit: cover; }
+  .call-local .call-name { bottom: 4px; left: 4px; }
+  .call-err {
+    position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
+    z-index: 65; max-width: 90%;
+    display: none; align-items: center; justify-content: center;
+    padding: 10px 16px; border-radius: 12px;
+    background: rgba(239,68,68,0.95); color: #fff;
+    font-size: 0.82rem; box-shadow: 0 12px 30px -10px rgba(0,0,0,0.6);
+    text-align: center;
+  }
+  .call-err p { background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.3); color: #fca5a5;
+    padding: 14px 20px; border-radius: 14px; max-width: 420px; text-align: center; }
+  .call-toolbar {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    z-index: 63; display: flex; align-items: center; justify-content: center;
+    gap: 10px; padding: 10px 14px; border-radius: 999px;
+    background: rgba(10,15,30,0.92); backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.12);
+    box-shadow: 0 16px 40px -12px rgba(0,0,0,0.9);
+  }
+  .call-btn {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 3px; min-width: 64px; padding: 8px 10px;
+    background: rgba(255,255,255,0.08); color: #fff;
+    border: 1px solid transparent; border-radius: 12px;
+    font-size: 0.68rem; font-weight: 600; cursor: pointer;
+    transition: background 0.15s ease, transform 0.1s ease;
+  }
+  .call-btn:hover { background: rgba(255,255,255,0.16); }
+  .call-btn:active { transform: scale(0.96); }
+  .call-btn svg { width: 22px; height: 22px; display: block; }
+  .call-btn.off { background: rgba(239,68,68,0.35); }
+  .call-btn.danger { background: #dc2626; border-color: rgba(255,255,255,0.2); min-width: 96px; }
+  .call-btn.danger:hover { background: #ef4444; }
+  .call-btn.danger svg { width: 24px; height: 24px; }
+
+  .support-panel { margin-bottom: 20px; }
+  .support-threads { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+  .support-thread-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px; border-radius: 14px;
+    background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
+    transition: border-color 0.2s ease;
+  }
+  .support-thread-row:hover { border-color: rgba(139,92,246,0.4); }
+  .support-thread-row.read { opacity: 0.6; }
+  .unread-badge {
+    min-width: 22px; height: 22px; border-radius: 999px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 0.72rem; font-weight: 700;
+    background: linear-gradient(135deg, var(--primary), var(--primary-2));
+    color: #fff; padding: 0 6px; flex: none;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-head row-head">
+  <div>
+    <h1 class="page-title">{{ community.name }}</h1>
+    <p class="page-sub">{{ community.description|default:'Aucune description.' }}</p>
+  </div>
+  <div class="head-actions">
+    {% if call_can_start and not community.is_support %}
+    <form method="post" action="{% url 'communities:start_call' community.slug %}" class="row gap">
+      {% csrf_token %}
+      <input type="hidden" name="call_type" value="video">
+      <button class="btn call" type="submit">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px; margin-right:6px;"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+        Appel vidéo
+      </button>
+    </form>
+  {% endif %}
+    {% if perms.manage_members or perms.moderate or perms.edit_community or perms.ban_users %}
+      <a class="btn ghost" href="{% url 'communities:manage' community.slug %}">
+        Gérer
+      </a>
+    {% endif %}
+    {% if membership %}
+      <form method="post" action="{% url 'communities:leave' community.slug %}">
+        {% csrf_token %}
+        <button class="btn ghost danger" type="submit">Quitter</button>
+      </form>
+    {% else %}
+      {% if not request.user.is_guest or community.guests_allowed %}
+        <form method="post" action="{% url 'communities:join' community.slug %}">
+          {% csrf_token %}
+          <button class="btn primary" type="submit">Rejoindre</button>
+        </form>
+      {% endif %}
+    {% endif %}
+  </div>
+</div>
+
+{% if community.is_support and request.user.is_site_admin %}
+  <section class="card support-panel">
+    <div class="card-headline">
+      <h3 class="card-title">
+        Demandes de contact
+      </h3>
+      <span class="muted">{{ support_requests|length }} demande{% if support_requests|length > 1 %}s{% endif %}</span>
+    </div>
+    {% if support_requests %}
+      <ul class="support-threads">
+        {% for t in support_requests %}
+          <li class="thread-row-wrap" style="display: flex; align-items: center; gap: 8px;">
+            <a class="support-thread-row" style="flex: 1;" href="{% url 'communities:support_thread' community.slug t.pk %}">
+              <div class="chat-avatar {% if t.user.is_guest %}guest{% else %}subadmin{% endif %}">
+                {{ t.user.username|slice:":1"|upper }}
+              </div>
+              <div class="member-info">
+                <span class="chat-author">{% if t.user.is_guest %}#{% endif %}{{ t.user.username }}</span>
+                <span class="member-role">
+                  {% if t.user.is_online %}En ligne{% else %}Hors ligne{% endif %}
+                  {% if t.admin %} · Contacte {{ t.admin.username }}{% endif %}
+                </span>
+              </div>
+              {% if t.unread > 0 %}
+                <span class="unread-badge">{{ t.unread }}</span>
+              {% endif %}
+            </a>
+            <form method="post" action="{% url 'communities:support_delete' community.slug t.pk %}"
+                  onsubmit="return confirm('Êtes-vous sûr de supprimer cette conversation ?');">
+              {% csrf_token %}
+              <button class="btn ghost small danger" type="submit">Supprimer</button>
+            </form>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="muted">Aucune demande pour le moment.</p>
+    {% endif %}
+  </section>
+{% elif community.is_support %}
+  <section class="card support-panel">
+    <div class="card-headline">
+      <h3 class="card-title">Contacter un administrateur</h3>
+    </div>
+    <p class="muted">
+      Choisis l’administrateur avec qui tu veux discuter. Tu as une seule
+      conversation par administrateur.
+    </p>
+    <form method="post" action="{% url 'communities:support_start' community.slug %}" class="stack">
+      {% csrf_token %}
+      {{ support_form.admin }}
+      {{ support_form.text }}
+      <button class="btn primary block" type="submit">Envoyer</button>
+    </form>
+    {% if support_threads %}
+      <div class="divider"></div>
+      <h4 class="card-title">Tes conversations</h4>
+      <ul class="support-threads">
+        {% for t in support_threads %}
+          <li>
+            <a class="support-thread-row" href="{% url 'communities:support_thread' community.slug t.pk %}">
+              <div class="chat-avatar admin">{{ t.admin.username|slice:":1"|upper|default:"?" }}</div>
+              <div class="member-info">
+                <span class="chat-author">{{ t.admin.username|default:"Admin" }}</span>
+                <span class="member-role">
+                  {% if t.status == 'open' %}Ouverte{% else %}Fermée{% endif %}
+                  {% if t.unread > 0 %} · non lue{% endif %}
+                </span>
+              </div>
+              {% if t.unread > 0 %}
+                <span class="unread-badge">{{ t.unread }}</span>
+              {% endif %}
+            </a>
+          </li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  </section>
+{% endif %}
+
+{% if not community.is_support %}
+<div class="community-layout">
+  <section class="card chat-card">
+    <div class="card-headline">
+      <h3 class="card-title">Discussion</h3>
+      <span class="muted">{{ chat_messages|length }} message{% if chat_messages|length > 1 %}s{% endif %}</span>
+    </div>
+
+    <div class="chat-log" id="chat-log">
+      {% if not chat_messages %}
+        <div class="chat-empty">
+          <p class="muted">Le premier message de cette communauté est à écrire…</p>
+        </div>
+      {% endif %}
+      {% for m in chat_messages %}
+        <div class="chat-msg" id="msg-{{ m.pk }}">
+          <div class="chat-avatar {% if m.author.is_guest %}guest{% elif m.author.is_site_admin %}admin{% endif %}">
+            {{ m.author.username|slice:":1"|upper|default:"?" }}
+          </div>
+          <div class="chat-body">
+            <div class="chat-meta">
+              <span class="chat-author{% if m.author.is_guest %} guest{% endif %}">
+                {% if m.author %}{{ m.author.username }}{% else %}Utilisateur supprimé{% endif %}
+              </span>
+              <span class="muted time">{{ m.created_at|timesince }}</span>
+              {% if request.user.is_site_admin %}<span class="muted time">admin</span>{% endif %}
+            </div>
+            <div class="chat-text">{{ m.text|linebreaksbr }}</div>
+          </div>
+          {% if perms.moderate or m.author == request.user %}
+            <form method="post" action="{% url 'communities:delete_message' community.slug m.pk %}">
+              {% csrf_token %}
+              <button class="btn ghost small danger" type="submit" data-confirm="Supprimer ce message ?">Supprimer</button>
+            </form>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </div>
+
+    {% if message_form %}
+      <form method="post" action="{% url 'communities:post_message' community.slug %}" class="chat-form">
+        {% csrf_token %}
+        {{ message_form.text }}
+        <button class="btn primary" type="submit">
+          Envoyer
+        </button>
+      </form>
+    {% else %}
+      <div class="notice info">Rejoins la communauté pour écrire des messages.</div>
+    {% endif %}
+  </section>
+
+  <aside class="card members-card">
+    <div class="card-headline">
+      <h3 class="card-title">Membres</h3>
+      <span class="muted">{{ members|length }}</span>
+    </div>
+    <ul class="member-list">
+      {% for member in members %}
+        <li class="member-row">
+          <div class="chat-avatar {% if member.user.is_guest %}guest{% elif member.user.is_site_admin %}admin{% elif member.role == 'sub_admin' %}subadmin{% endif %}">
+            {{ member.user.username|slice:":1"|upper }}
+          </div>
+          <div class="member-info">
+            <span class="chat-author{% if member.user.is_banned %} muted{% endif %}">{{ member.user.username }}</span>
+            <span class="member-role">
+              {% if member.user.is_site_admin %}Admin du site
+              {% elif member.role == 'sub_admin' %}Sous-admin
+              {% elif member.user.is_guest %}Invité
+              {% else %}Membre{% endif %}
+            </span>
+          </div>
+          {% if member.user.is_online and not member.user.is_banned %}
+            <span class="online-dot" title="En ligne"></span>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  </aside>
+</div>
+{% endif %}
+
+{% if call_can_join and not call_is_starter and not community.is_support %}
+  <div class="call-bar" id="call-bar">
+    <span class="call-bar-info">
+      <span class="call-dot"></span>
+      {{ active_call.get_call_type_display }} en cours par {{ active_call.started_by.username }}
+    </span>
+    <button class="btn primary" data-join-call>Rejoindre</button>
+  </div>
+{% endif %}
+
+{% if call_can_start or call_can_join %}
+  {% if not community.is_support %}
+  <div class="call-modal" id="call-modal">
+    <div class="call-grid" id="call-grid"></div>
+    <div class="call-err" id="call-err" style="display:none;">
+      <span id="call-err-text">Impossible d'accéder à la caméra ou au micro. Autorise-les dans le navigateur.</span>
+    </div>
+    <div class="call-local" id="call-local-box">
+      <video id="call-local" autoplay muted playsinline></video>
+      <span class="call-name">Moi</span>
+    </div>
+    <div class="call-toolbar">
+      <button class="call-btn" id="call-mic" type="button" title="Couper / réactiver le micro">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="9" y="2" width="6" height="12" rx="3"></rect>
+          <path d="M5 10a7 7 0 0 0 14 0"></path>
+          <line x1="12" y1="17" x2="12" y2="22"></line>
+          <line x1="8" y1="22" x2="16" y2="22"></line>
+        </svg>
+        Micro
+      </button>
+      <button class="call-btn" id="call-cam" type="button" title="Couper / réactiver la caméra">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M23 7l-7 5 7 5V7z"></path>
+          <rect x="1" y="5" width="15" height="14" rx="2"></rect>
+        </svg>
+        Caméra
+      </button>
+      {% if call_is_starter %}
+        <form id="end-call-form" method="post" action="{% url 'communities:end_call' community.slug active_call.pk %}">
+          {% csrf_token %}
+          <button class="call-btn danger" type="submit" title="Couper l'appel pour tout le monde">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="8" y1="8" x2="16" y2="16"></line>
+            </svg>
+            Raccrocher
+          </button>
+        </form>
+      {% else %}
+        <button class="call-btn danger" id="call-leave" type="button" title="Quitter l'appel">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="8" y1="8" x2="16" y2="16"></line>
+          </svg>
+          Quitter
+        </button>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+{% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  var slug = '{{ community.slug|escapejs }}';
+  var uid = '{{ request.user.username|escapejs }}';
+  var activePk = {% if active_call %}{{ active_call.pk }}{% else %}0{% endif %};
+  var videoMode = {% if active_call and active_call.call_type == 'video' %}true{% else %}false{% endif %};
+  var callIsStarter = {% if call_is_starter %}true{% else %}false{% endif %};
+  var signalUrl = {% if active_call %}'{% url 'communities:call_signal' community.slug active_call.pk %}'{% else %}''{% endif %};
+  var turnUrl = '{% url 'communities:turn_credentials' %}';
+  var csrfToken = '{{ csrf_token }}';
+  var callModal = document.getElementById('call-modal');
+  var callGrid = document.getElementById('call-grid');
+  var endCallForm = document.getElementById('end-call-form');
+
+  var pcConfig = { iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' }
+  ] };
+  var turnLoaded = false;
+
+  function loadTurn() {
+    if (turnLoaded || !turnUrl) return Promise.resolve();
+    turnLoaded = true;
+    return fetch(turnUrl, { credentials: 'same-origin' })
+      .then(function (r) { if (!r.ok) return null; return r.json(); })
+      .then(function (j) {
+        if (j && j.iceServers && j.iceServers.length) {
+          j.iceServers.forEach(function (s) { pcConfig.iceServers.push(s); });
+        }
+      })
+      .catch(function () {});
+  }
+
+  function removePeerBox(peerId) {
+    var box = document.getElementById('peer-' + peerId);
+    if (box) { box.remove(); }
+    delete peerName[peerId];
+  }
+
+  var myId = (crypto.randomUUID ? crypto.randomUUID() : 'c-' + Math.random().toString(36).slice(2) + Date.now());
+  var peers = {};        // peerId -> RTCPeerConnection
+  var peerName = {};     // peerId -> nom affiché
+  var joined = false;    // vrai quand on a annoncé sa présence (signal 'join')
+  var lastSigId = 0;
+  var localStream = null;
+  var micOn = true;
+  var camOn = true;
+  var pollTimer = null;
+  var inCall = false;
+
+  function getToken() {
+    if (csrfToken) return csrfToken;
+    var m = document.cookie.match(/csrftoken=([^;]+)/);
+    return m ? m[1] : '';
+  }
+
+  function postSignal(kind, data, target) {
+    if (!signalUrl) return Promise.resolve();
+    return fetch(signalUrl, {
+      method: 'POST',
+      headers: { 'X-CSRFToken': getToken(), 'Content-Type': 'application/x-www-form-urlencoded' },
+      credentials: 'same-origin',
+      body: 'kind=' + encodeURIComponent(kind) +
+            '&data=' + encodeURIComponent(data || '') +
+            '&sender=' + encodeURIComponent(myId) +
+            '&target=' + encodeURIComponent(target || '')
+    }).then(function (r) { return r.json(); });
+  }
+
+  function startPolling() {
+    stopPolling();
+    pollTimer = setInterval(pollSignals, 1200);
+  }
+
+  function stopPolling() {
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+  }
+
+  function pollSignals() {
+    if (!callModal) return;
+    fetch(signalUrl + '?after=' + lastSigId, { credentials: 'same-origin' })
+      .then(function (r) {
+        if (r.status === 404) { callEnded(); return null; }
+        if (!r.ok) return null;
+        return r.json();
+      })
+      .then(function (j) { if (j && j.signals) j.signals.forEach(handleSignal); })
+      .catch(function () {});
+  }
+
+  function callEnded() {
+    stopPolling();
+    inCall = false;
+    Object.keys(peers).forEach(function (p) { removePeer(p); });
+    if (localStream) {
+      localStream.getTracks().forEach(function (t) { t.stop(); });
+      localStream = null;
+    }
+    var err = document.getElementById('call-err');
+    if (err) {
+      var p = err.querySelector('p');
+      if (p) p.textContent = "L'appel a été terminé par l'administrateur.";
+      err.style.display = 'flex';
+    }
+    setTimeout(function () {
+      closeCallUi();
+      window.location.reload();
+    }, 1500);
+  }
+
+  function handleSignal(s) {
+    if (s.sender === myId) return;
+    // Tant qu'on ne s'est pas annoncé (signal 'join' parti), on ignore tout :
+    // éviter d'ouvrir une connexion sans piste locale et sans avoir été vu.
+    if (!joined) return;
+    if (s.pk <= lastSigId) return;
+    lastSigId = s.pk;
+    if (s.kind === 'join') {
+      var name = '';
+      try { name = JSON.parse(s.data || '{}').name || ''; } catch (e) {}
+      peerName[s.sender] = name || 'Participant';
+      connectTo(s.sender);
+    } else if (s.kind === 'offer') {
+      if (s.target === myId) onOffer(s.sender, s.data);
+    } else if (s.kind === 'answer') {
+      if (s.target === myId) onAnswer(s.sender, s.data);
+    } else if (s.kind === 'ice') {
+      if (s.target === myId) onIce(s.sender, s.data);
+    } else if (s.kind === 'bye') {
+      removePeer(s.sender);
+    }
+  }
+
+  function addLocalTracks(pc) {
+    if (!localStream) return;
+    localStream.getTracks().forEach(function (track) {
+      pc.addTrack(track, localStream);
+    });
+  }
+
+  function connectTo(peerId) {
+    if (peers[peerId]) return;
+    var pc = new RTCPeerConnection(pcConfig);
+    peers[peerId] = pc;
+    addLocalTracks(pc);
+    pc.onicecandidate = function (e) {
+      if (e.candidate) postSignal('ice', JSON.stringify(e.candidate), peerId);
+    };
+    pc.ontrack = function (e) {
+      // Firefox peut ne pas peupler e.streams : on reconstruit alors un flux.
+      var stream = e.streams && e.streams[0];
+      if (!stream) {
+        stream = new MediaStream(e.track ? [e.track] : []);
+      }
+      addRemoteVideo(peerId, stream);
+    };
+    pc.onconnectionstatechange = function () {
+      if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
+        removePeer(peerId);
+      }
+    };
+    if (myId < peerId) {
+      pc.createOffer().then(function (offer) {
+        return pc.setLocalDescription(offer);
+      }).then(function () {
+        postSignal('offer', JSON.stringify(pc.localDescription), peerId);
+      }).catch(function () {});
+    }
+  }
+
+  function onOffer(peerId, data) {
+    if (!peers[peerId]) connectTo(peerId);
+    var pc = peers[peerId];
+    if (!pc) return;
+    pc.setRemoteDescription(JSON.parse(data)).then(function () {
+      flushIce(pc);
+      return pc.createAnswer();
+    }).then(function (answer) {
+      return pc.setLocalDescription(answer);
+    }).then(function () {
+      postSignal('answer', JSON.stringify(pc.localDescription), peerId);
+    }).catch(function () {});
+  }
+
+  function onAnswer(peerId, data) {
+    var pc = peers[peerId];
+    if (!pc) return;
+    pc.setRemoteDescription(JSON.parse(data)).then(function () {
+      flushIce(pc);
+    }).catch(function () {});
+  }
+
+  function onIce(peerId, data) {
+    var pc = peers[peerId];
+    if (!pc) return;
+    var candidate = JSON.parse(data);
+    if (pc.remoteDescription && pc.remoteDescription.type) {
+      pc.addIceCandidate(candidate).catch(function () {});
+    } else {
+      pc.pendingIce = pc.pendingIce || [];
+      pc.pendingIce.push(candidate);
+    }
+  }
+
+  function flushIce(pc) {
+    if (!pc || !pc.remoteDescription || !pc.remoteDescription.type) return;
+    (pc.pendingIce || []).forEach(function (candidate) {
+      pc.addIceCandidate(candidate).catch(function () {});
+    });
+    pc.pendingIce = [];
+  }
+
+  function addRemoteVideo(peerId, streamOrEl) {
+    if (!callGrid) return;
+    var box = document.getElementById('peer-' + peerId);
+    if (!box) {
+      box = document.createElement('div');
+      box.className = 'call-peer';
+      box.id = 'peer-' + peerId;
+      var lbl = document.createElement('span');
+      lbl.className = 'call-name';
+      lbl.textContent = peerName[peerId] || 'Participant';
+      if (streamOrEl instanceof HTMLElement) {
+        box.appendChild(streamOrEl);
+        streamOrEl.className = 'lk-video';
+      } else {
+        var v = document.createElement('video');
+        v.autoplay = true;
+        v.playsInline = true;
+        box.appendChild(v);
+      }
+      box.appendChild(lbl);
+      callGrid.appendChild(box);
+    }
+    var video = box.querySelector('video') || (streamOrEl instanceof HTMLElement ? streamOrEl : null);
+    if (video && !(streamOrEl instanceof HTMLElement) && !video.srcObject) {
+      video.srcObject = streamOrEl;
+    }
+  }
+
+  function removePeer(peerId) {
+    var pc = peers[peerId];
+    if (pc) { try { pc.close(); } catch (e) {} delete peers[peerId]; }
+    var box = document.getElementById('peer-' + peerId);
+    if (box) box.remove();
+    delete peerName[peerId];
+  }
+
+  function openCall() {
+    if (!callModal || inCall) return;
+    inCall = true;
+    micOn = true;
+    camOn = true;
+    if (micBtn) micBtn.classList.remove('off');
+    if (camBtn) camBtn.classList.remove('off');
+    callGrid.innerHTML = '';
+    refreshError(false);
+    callModal.classList.add('open');
+    var bar = document.getElementById('call-bar');
+    if (bar) bar.style.display = 'none';
+    if (!callModal || inCall) return;
+    inCall = true;
+    micOn = true;
+    camOn = true;
+    if (micBtn) micBtn.classList.remove('off');
+    if (camBtn) camBtn.classList.remove('off');
+    callGrid.innerHTML = '';
+    refreshError(false);
+    callModal.classList.add('open');
+    var bar = document.getElementById('call-bar');
+    if (bar) bar.style.display = 'none';
+    openP2P();
+  }
+
+  function openP2P() {
+    loadTurn();
+    // Démarrage immédiat de la lecture des signaux : chaque participant se
+    // découvre mutuellement même si la caméra/micro met du temps à démarrer.
+    startPolling();
+    var wantVideo = true;
+    var constraints = {
+      audio: true,
+      video: wantVideo ? { width: { ideal: 1280 }, height: { ideal: 720 } } : false
+    };
+    navigator.mediaDevices.getUserMedia(constraints).then(function (stream) {
+      localStream = stream;
+      var base = callModal.querySelector('#call-local');
+      if (base) { base.srcObject = stream; }
+      joined = true;
+      lastSigId = 0;
+      postSignal('join', JSON.stringify({ name: uid })).catch(function () {});
+    }).catch(function (err) {
+      if (wantVideo) {
+        navigator.mediaDevices.getUserMedia({ audio: true, video: false }).then(function (stream) {
+          localStream = stream;
+          videoMode = false;
+          camOn = false;
+          if (camBtn) camBtn.classList.add('off');
+          var base = callModal.querySelector('#call-local');
+          if (base) { base.srcObject = stream; }
+          refreshError(true);
+          joined = true;
+          lastSigId = 0;
+          postSignal('join', JSON.stringify({ name: uid })).catch(function () {});
+        }).catch(function (err2) {
+          refreshError(true);
+          joined = true;
+          lastSigId = 0;
+          postSignal('join', JSON.stringify({ name: uid })).catch(function () {});
+        });
+      } else {
+        refreshError(true);
+        joined = true;
+        lastSigId = 0;
+        postSignal('join', JSON.stringify({ name: uid })).catch(function () {});
+      }
+    });
+  }
+
+  function closeCall() {
+    inCall = false;
+    stopPolling();
+    postSignal('bye', '', '');
+    Object.keys(peers).forEach(function (p) { removePeer(p); });
+    if (localStream) {
+      localStream.getTracks().forEach(function (t) { t.stop(); });
+      localStream = null;
+    }
+    var base = callModal ? callModal.querySelector('#call-local') : null;
+    if (base) { base.srcObject = null; base.removeAttribute('src'); }
+  }
+
+  function closeCallUi() {
+    if (callModal) callModal.classList.remove('open');
+    var bar = document.getElementById('call-bar');
+    if (bar && !inCall) bar.style.display = '';
+  }
+
+  function refreshError(on) {
+    var el = document.getElementById('call-err');
+    if (!el) return;
+    el.style.display = on ? 'flex' : 'none';
+  }
+
+  var micBtn = document.getElementById('call-mic');
+  if (micBtn) micBtn.addEventListener('click', function () {
+    micOn = !micOn;
+    if (localStream) {
+      localStream.getAudioTracks().forEach(function (t) { t.enabled = micOn; });
+    }
+    micBtn.classList.toggle('off', !micOn);
+  });
+
+  var camBtn = document.getElementById('call-cam');
+  if (camBtn) camBtn.addEventListener('click', function () {
+    camOn = !camOn;
+    if (localStream) {
+      localStream.getVideoTracks().forEach(function (t) { t.enabled = camOn; });
+    }
+    camBtn.classList.toggle('off', !camOn);
+  });
+
+  var leaveBtn = document.getElementById('call-leave');
+  if (leaveBtn) leaveBtn.addEventListener('click', function () {
+    closeCall();
+    closeCallUi();
+  });
+
+  if (endCallForm) endCallForm.addEventListener('submit', function () {
+    inCall = false;
+    stopPolling();
+  });
+
+  window.addEventListener('pagehide', function () {
+    if (!inCall) return;
+    stopPolling();
+    if (callIsStarter && endCallForm) {
+      // P2P : l'admin ferme l'appel pour tout le monde.
+      var fd = new FormData(endCallForm);
+      navigator.sendBeacon(endCallForm.action, fd);
+    } else if (signalUrl) {
+      // P2P : prévenir les autres qu'on part.
+      var bd = new URLSearchParams();
+      bd.append('kind', 'bye');
+      bd.append('sender', myId);
+      bd.append('target', '');
+      bd.append('data', '');
+      fetch(signalUrl, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': getToken(), 'Content-Type': 'application/x-www-form-urlencoded' },
+        credentials: 'same-origin',
+        body: bd.toString(),
+        keepalive: true
+      });
+    }
+  });
+
+  var joinBtn = document.querySelector('[data-join-call]');
+  if (joinBtn) joinBtn.addEventListener('click', function () { if (activePk) openCall(); });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && callModal && callModal.classList.contains('open')) {
+      if (callIsStarter) {
+        if (endCallForm) endCallForm.submit();
+      } else {
+        closeCall();
+        closeCallUi();
+      }
+    }
+  });
+
+  if (activePk && window.location.search.indexOf('join=1') !== -1) openCall();
+
+  var log = document.getElementById('chat-log');
+  if (log) log.scrollTop = log.scrollHeight;
+</script>
+{% endblock %}

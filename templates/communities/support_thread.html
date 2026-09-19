@@ -1,0 +1,97 @@
+{% extends 'base.html' %}
+
+{% block title %}Discussion avec {{ thread.admin.username|default:'l\'équipe' }} — {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-head row-head">
+  <div>
+    <h1 class="page-title">Discussion d’assistance</h1>
+    <p class="page-sub">
+      {% if request.user.is_site_admin %}
+        {{ thread.user.username|default:'Utilisateur supprimé' }} ↔ {{ thread.admin.username }}
+      {% else %}
+        Tu échanges avec {{ thread.admin.username|default:'l’équipe' }}.
+      {% endif %}
+    </p>
+  </div>
+  <div class="head-actions">
+    <a class="btn ghost" href="{% url 'communities:detail' community.slug %}">← Retour</a>
+    {% if request.user.is_site_admin %}
+      <form method="post" action="{% url 'communities:support_delete' community.slug thread.pk %}"
+            onsubmit="return confirm('Supprimer définitivement cette conversation ?');">
+        {% csrf_token %}
+        <button class="btn ghost danger" type="submit">Supprimer</button>
+      </form>
+    {% endif %}
+    {% if thread.status == 'open' and not thread.deleted %}
+      <form method="post" action="{% url 'communities:support_close' community.slug thread.pk %}">
+        {% csrf_token %}
+        <button class="btn ghost danger" type="submit">Fermer la discussion</button>
+      </form>
+    {% else %}
+      <span class="badge private">Fermée</span>
+    {% endif %}
+  </div>
+</div>
+
+{% if deleted_notice %}
+  <div class="card support-panel">
+    <div class="notice info" style="padding: 18px; text-align: center;">
+      <h3 style="margin: 0 0 6px;">Conversation supprimée par l’admin</h3>
+      <p class="muted" style="margin: 0;">
+        Cette discussion n’existe plus. Tu peux en ouvrir une nouvelle avec
+        {{ thread.admin.username|default:'un administrateur' }} si besoin.
+      </p>
+    </div>
+  </div>
+{% else %}
+<section class="card chat-card">
+  <div class="card-headline">
+    <h3 class="card-title">{{ thread.admin.username|default:'Discussion' }}</h3>
+    <span class="muted">{{ smsgs|length }} message{% if smsgs|length > 1 %}s{% endif %}</span>
+  </div>
+
+  <div class="chat-log" id="chat-log">
+    {% if not smsgs %}
+      <div class="chat-empty">
+        <p class="muted">Aucun message pour l’instant.</p>
+      </div>
+    {% endif %}
+    {% for m in smsgs %}
+      <div class="chat-msg" id="smsg-{{ m.pk }}">
+        <div class="chat-avatar {% if m.author.is_guest %}guest{% elif m.author.is_site_admin %}admin{% endif %}">
+          {{ m.author.username|slice:":1"|upper|default:"?" }}
+        </div>
+        <div class="chat-body">
+          <div class="chat-meta">
+            <span class="chat-author{% if m.author.is_guest %} guest{% endif %}">
+              {% if m.author %}{{ m.author.username }}{% else %}Utilisateur supprimé{% endif %}
+            </span>
+            <span class="muted time">{{ m.created_at|timesince }}</span>
+            {% if m.author.is_site_admin %}<span class="muted time">admin</span>{% endif %}
+          </div>
+          <div class="chat-text">{{ m.text|linebreaksbr }}</div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+
+  {% if thread.status == 'open' %}
+    <form method="post" action="{% url 'communities:support_reply' community.slug thread.pk %}" class="chat-form">
+      {% csrf_token %}
+      {{ reply_form.text }}
+      <button class="btn primary" type="submit">Envoyer</button>
+    </form>
+  {% else %}
+    <div class="notice info">Cette discussion est fermée.</div>
+  {% endif %}
+</section>
+{% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  var log = document.getElementById('chat-log');
+  if (log) log.scrollTop = log.scrollHeight;
+</script>
+{% endblock %}

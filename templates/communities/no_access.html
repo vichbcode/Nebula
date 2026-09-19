@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+
+{% block title %}Accès refusé — {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div class="card empty center-block">
+  <h2>Accès refusé</h2>
+  <p class="muted">
+    « {{ community.name }} » est une communauté privée
+    {% if request.user.is_guest %}
+      réservée aux membres. Les invités n'accèdent qu'aux communautés ouvertes.
+    {% else %}
+      : seuls ses membres, ajoutés par les administrateurs, peuvent y entrer.
+    {% endif %}
+  </p>
+  <div class="stack">
+    <a class="btn primary" href="{% url 'communities:home' %}">Voir mes communautés</a>
+  </div>
+</div>
+{% endblock %}

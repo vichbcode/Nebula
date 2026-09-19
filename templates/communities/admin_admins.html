@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+
+{% block title %}Administrateurs — {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-head row-head">
+  <div>
+    <h1 class="page-title">Administrateurs du site</h1>
+    <p class="page-sub">4 postes maximum. Les admins gèrent leur pseudo et mot de passe dans leurs paramètres.</p>
+  </div>
+  <a class="btn ghost" href="{% url 'communities:admin_dashboard' %}">← Espace admin</a>
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <h3 class="card-title">Admins actuels <span class="badge admin">{{ admins|length }}/4</span></h3>
+    <ul class="admin-list">
+      {% for a in admins %}
+        <li class="admin-row">
+          <div class="chat-avatar admin">{{ a.username|slice:":1"|upper }}</div>
+          <div class="member-info">
+            <span class="chat-author">{{ a.username }}</span>
+            <span class="muted">Administrateur du site</span>
+          </div>
+          <form method="post" action="{% url 'communities:admin_admins' %}">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="demote">
+            <input type="hidden" name="user_id" value="{{ a.id }}">
+            <button class="btn ghost small" type="submit" data-confirm="Retirer {{ a.username }} des administrateurs ?" {% if admins|length <= 1 or a == request.user %}disabled{% endif %}>Révoquer</button>
+          </form>
+        </li>
+      {% empty %}
+        <li class="muted">Aucun administrateur.</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3 class="card-title">Nommer un administrateur</h3>
+    <p class="muted">Promouvoir un utilisateur déjà inscrit.</p>
+    <form method="post" class="stack" novalidate>
+      {% csrf_token %}
+      <input type="hidden" name="action" value="promote">
+      <label class="field">
+        <span class="field-label">Pseudo de l'utilisateur inscrit</span>
+        <input class="input" name="username" placeholder="Le pseudo exact" autocomplete="off">
+      </label>
+      <button class="btn primary" type="submit" {% if admins|length >= 4 %}disabled{% endif %}>Nommer admin</button>
+    </form>
+
+    <div class="divider"></div>
+    <h3 class="card-title">Créer un nouvel utilisateur admin</h3>
+    <form method="post" class="stack" novalidate>
+      {% csrf_token %}
+      <input type="hidden" name="action" value="create">
+      <label class="field">
+        <span class="field-label">Pseudo</span>
+        <input class="input" name="username" placeholder="Pseudo" autocomplete="off">
+      </label>
+      <label class="field">
+        <span class="field-label">Mot de passe</span>
+        <input class="input" type="password" name="password" placeholder="••••••••">
+      </label>
+      <button class="btn primary" type="submit" {% if admins|length >= 4 %}disabled{% endif %}>Créer l'admin</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

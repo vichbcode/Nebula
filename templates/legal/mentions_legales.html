@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+
+{% block title %}Mentions légales — {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div class="card narrow-card" style="max-width: 720px; margin: 0 auto;">
+  <h1 class="card-title">Mentions légales</h1>
+
+  <section class="legal-section">
+    <h2>Éditeur du site</h2>
+    <p>Le site {{ SITE_NAME }} est un projet personnel dont l'éditeur utilise le pseudo <strong>Anonyme</strong>.</p>
+    <p>Contact : <a href="mailto:zogixa@proton.com">zogixa@proton.com</a></p>
+    <p>Directeur de la publication : <strong>Anonyme</strong></p>
+  </section>
+
+  <section class="legal-section">
+    <h2>Hébergement</h2>
+    <p>Le site {{ SITE_NAME }} est hébergé par :</p>
+    <p><strong>Vercel Inc.</strong><br>
+    440 North Barranca Avenue, Suite 4133<br>
+    Covina, CA 91723<br>
+    États-Unis<br>
+    Site web : <a href="https://vercel.com" rel="noopener" target="_blank">vercel.com</a></p>
+  </section>
+
+  <section class="legal-section">
+    <h2>Propriété intellectuelle</h2>
+    <p>La structure, le design, les textes et les éléments graphiques du site {{ SITE_NAME }} sont la propriété de son éditeur. Toute reproduction ou utilisation sans autorisation préalable est interdite, sauf accord écrit.</p>
+    <p>Les contenus publiés par les utilisateurs (messages, pseudos) appartiennent à leurs auteurs, qui restent responsables de ce qu'ils publient.</p>
+  </section>
+
+  <section class="legal-section">
+    <h2>Limitation de responsabilité</h2>
+    <p>{{ SITE_NAME }} met ses services à disposition (communautés, messagerie, appels audio/vidéo). L'éditeur ne saurait être tenu responsable de l'usage fait du site par les utilisateurs, ni de la perte de données, ni de l'indisponibilité temporaire du service.</p>
+    <p>Les appels audio/vidéo sont relayés par un service tiers (Jitsi Meet) ; le site ne les enregistre pas et n'en conserve pas le contenu.</p>
+  </section>
+
+  <section class="legal-section">
+    <h2>Droit applicable</h2>
+    <p>Le site est soumis au droit français. En cas de litige, et à défaut de résolution amiable, les tribunaux français seront seuls compétents.</p>
+  </section>
+</div>
+{% endblock %}

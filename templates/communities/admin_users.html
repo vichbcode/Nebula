@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+
+{% block title %}Utilisateurs inscrits — {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-head row-head">
+  <div>
+    <h1 class="page-title">Utilisateurs inscrits</h1>
+    <p class="page-sub">{{ users|length }} comptes inscrits.</p>
+  </div>
+  <a class="btn ghost" href="{% url 'communities:admin_dashboard' %}">← Espace admin</a>
+</div>
+
+<div class="card">
+  <ul class="admin-list">
+    {% for u in users %}
+      <li class="admin-row {% if u.is_banned %}row-muted{% endif %}">
+        <div class="chat-avatar {% if u.is_site_admin %}admin{% endif %}">{{ u.username|slice:":1"|upper }}</div>
+        <div class="member-info">
+          <span class="chat-author">{{ u.username }}</span>
+          <span class="muted">
+            {% if u.is_site_admin %}Administrateur du site
+            {% elif u.is_banned %}Banni
+            {% else %}Membre inscrit{% endif %}
+          </span>
+        </div>
+        <div class="row gap small">
+          {% if u.is_site_admin %}
+            <span class="badge admin">Admin</span>
+          {% elif u.is_banned %}
+            <form method="post" action="{% url 'communities:admin_users_unban' u.id %}">
+              {% csrf_token %}
+              <button class="btn ghost small success" type="submit">Débloquer</button>
+            </form>
+          {% else %}
+            <form method="post" action="{% url 'communities:admin_users_ban' u.id %}">
+              {% csrf_token %}
+              <button class="btn ghost small danger" type="submit" data-confirm="Bannir {{ u.username }} ?">Bannir</button>
+            </form>
+          {% endif %}
+        </div>
+      </li>
+    {% empty %}
+      <li class="muted">Aucun utilisateur inscrit pour le moment.</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endblock %}

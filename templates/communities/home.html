@@ -1,0 +1,115 @@
+{% extends 'base.html' %}
+
+{% block title %}Communautés — {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-head row-head">
+  <div>
+    <h1 class="page-title">Communautés</h1>
+    <p class="page-sub">
+      {% if request.user.is_guest %}
+        Tu es invité&nbsp;: tu accèdes seulement aux communautés ouvertes.
+      {% elif request.user.is_site_admin %}
+        Mode administrateur : tu vois toutes les communautés.
+      {% else %}
+        Rejoins les communautés ouvertes — tu verras aussi celles où tu as été invité.
+      {% endif %}
+    </p>
+  </div>
+  {% if request.user.is_site_admin %}
+    <a class="btn primary" href="{% url 'communities:admin_community_create' %}">
+      Nouvelle communauté
+    </a>
+  {% endif %}
+</div>
+
+{% if admins %}
+  <section class="card admins-card" aria-label="Administrateurs connectés">
+    <div class="card-headline">
+      <h3 class="card-title">
+        <span class="admin-dot" aria-hidden="true"></span>
+        Administrateurs
+      </h3>
+      <span class="muted">
+        {{ admins|length }} admin{% if admins|length > 1 %}s{% endif %}
+      </span>
+    </div>
+    <ul class="admins-list">
+      {% for a in admins %}
+        <li class="admin-chip" title="{{ a.username }}{% if a.is_online %} — en ligne{% endif %}">
+          <div class="chat-avatar admin">{{ a.username|slice:":1"|upper }}</div>
+          <div class="member-info">
+            <span class="chat-author">
+              {% if a.is_online %}
+                <span class="online-dot" title="En ligne"></span>
+              {% endif %}
+              {{ a.username }}
+            </span>
+            <span class="member-role">
+              {% if a.is_online %}<span class="on">En ligne</span>{% else %}Hors ligne{% endif %}
+            </span>
+          </div>
+        </li>
+      {% endfor %}
+    </ul>
+    {% if support %}
+      <a class="btn primary block mt" href="{% url 'communities:detail' support.slug %}">
+        Solliciter un administrateur
+      </a>
+    {% endif %}
+  </section>
+{% endif %}
+
+{% if cards %}
+  <div class="community-grid">
+    {% for c in cards %}
+      <article class="card community-card">
+        <div class="community-card-top">
+          <div class="community-badge">{{ c.community.name|slice:":1"|upper }}</div>
+          <div class="community-tags">
+            {% if c.community.is_support %}
+              <span class="badge support">Solliciter un admin</span>
+            {% endif %}
+            {% if c.community.guests_allowed %}
+              <span class="badge guest">Ouverte aux invités</span>
+            {% else %}
+              <span class="badge private">Privée</span>
+            {% endif %}
+          </div>
+        </div>
+        <h2 class="community-name">{{ c.community.name }}</h2>
+        <p class="community-desc">
+          {% if c.community.description %}{{ c.community.description|truncatewords:26 }}{% else %}Aucune description.{% endif %}
+        </p>
+        <div class="community-meta">
+          <span class="muted">
+            {{ c.member_count }} membre{% if c.member_count > 1 %}s{% endif %}
+          </span>
+          {% if c.membership and c.role == 'sub_admin' %}
+            <span class="badge subadmin">Sous-admin</span>
+          {% endif %}
+        </div>
+        <div class="community-actions">
+          {% if c.membership %}
+            <a class="btn primary flex" href="{% url 'communities:detail' c.community.slug %}">Entrer</a>
+            <form method="post" action="{% url 'communities:leave' c.community.slug %}">
+              {% csrf_token %}
+              <button class="btn ghost small" type="submit">Quitter</button>
+            </form>
+          {% else %}
+            <form method="post" action="{% url 'communities:join' c.community.slug %}" class="flex-grow">
+              {% csrf_token %}
+              <button class="btn primary block" type="submit">Rejoindre</button>
+            </form>
+          {% endif %}
+        </div>
+      </article>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="card empty">
+    <h3>Aucune communauté pour le moment</h3>
+    <p class="muted">Il n'y a encore aucune communauté accessible. Reviens plus tard !</p>
+  </div>
+{% endif %}
+{% endblock %}

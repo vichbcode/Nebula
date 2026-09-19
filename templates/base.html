@@ -1,0 +1,135 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0a0e1a">
+  <title>{% block title %}{{ SITE_NAME }} — Rejoins des communautés{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+  {% block extra_head %}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %}">
+
+  {% if request.user.is_authenticated %}
+    <nav class="navbar" aria-label="Navigation">
+      <div class="navbar-inner container">
+        <a class="brand" href="{% url 'communities:home' %}">
+          <span class="brand-mark">N</span>
+          <span class="brand-name">{{ SITE_NAME }}</span>
+        </a>
+        <div class="nav-links desktop-only">
+          <a class="nav-link" href="{% url 'communities:home' %}">Communautés</a>
+          {% if request.user.is_site_admin %}
+            <a class="nav-link admin" href="{% url 'communities:admin_dashboard' %}">Espace Admin</a>
+          {% endif %}
+          <a class="nav-link" href="{% url 'accounts:settings' %}">Paramètres</a>
+        </div>
+        <div class="nav-user">
+          <span class="pill user-pill {% if request.user.is_guest %}guest{% elif request.user.is_site_admin %}admin{% endif %}">
+            {% if request.user.is_guest %}#{% endif %}{{ request.user.username }}
+          </span>
+          <form method="post" action="{% url 'accounts:logout' %}">
+            {% csrf_token %}
+            <button type="submit" class="btn ghost small" title="Déconnexion">Déconnexion</button>
+          </form>
+        </div>
+      </div>
+    </nav>
+  {% endif %}
+
+  <main class="container page">
+    {% block content %}{% endblock %}
+  </main>
+
+  {% if request.user.is_authenticated %}
+    <nav class="bottomnav" aria-label="Navigation mobile">
+      <a class="bottomnav-item" href="{% url 'communities:home' %}">
+        <span>Accueil</span>
+      </a>
+      {% if request.user.is_site_admin %}
+      <a class="bottomnav-item" href="{% url 'communities:admin_dashboard' %}">
+        <span>Admin</span>
+      </a>
+      {% endif %}
+      <a class="bottomnav-item" href="{% url 'accounts:settings' %}">
+        <span>Réglages</span>
+      </a>
+      <form method="post" action="{% url 'accounts:logout' %}" class="bottomnav-logout">
+        {% csrf_token %}
+        <button type="submit" class="bottomnav-item">
+          <span>Quitter</span>
+        </button>
+      </form>
+    </nav>
+  {% endif %}
+
+  <footer class="site-footer">
+    <div class="container">
+      <span>{{ SITE_NAME }}</span>
+      <span class="sep">·</span>
+      <a href="{% url 'mentions_legales' %}">Mentions légales</a>
+      <span class="sep">·</span>
+      <a href="{% url 'politique_confidentialite' %}">Politique de confidentialité</a>
+    </div>
+  </footer>
+
+  <dialog id="glob-confirm" class="confirm-dialog">
+    <div class="card">
+      <h3 class="card-title danger">Confirmation</h3>
+      <p id="glob-confirm-text"></p>
+      <div class="dialog-actions">
+        <button class="btn ghost" type="button" onclick="document.getElementById('glob-confirm').close()">Annuler</button>
+        <button class="btn danger" type="button" id="glob-confirm-ok">Confirmer</button>
+      </div>
+    </div>
+  </dialog>
+
+  {% if messages %}
+    <div class="toast-stack">
+      {% for message in messages %}
+        <div class="toast toast-{{ message.tags|default:'info' }}">
+          {{ message }}
+          <button class="toast-close" onclick="this.parentElement.remove()" aria-label="Fermer">&times;</button>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <script>
+    document.addEventListener('click', function (e) {
+      var close = e.target.closest('.toast-close');
+      if (close) close.parentElement.remove();
+    });
+    setTimeout(function () {
+      document.querySelectorAll('.toast').forEach(function (t) {
+        t.classList.add('toast-out');
+        setTimeout(function () { t.remove(); }, 400);
+      });
+    }, 5000);
+
+    (function () {
+      var dlg = document.getElementById('glob-confirm');
+      if (!dlg) return;
+      var txt = document.getElementById('glob-confirm-text');
+      var ok = document.getElementById('glob-confirm-ok');
+      document.addEventListener('click', function (e) {
+        var t = e.target.closest('[data-confirm]');
+        if (!t) return;
+        e.preventDefault();
+        var form = t.closest('form');
+        txt.textContent = t.getAttribute('data-confirm');
+        ok.onclick = function () {
+          dlg.close();
+          if (form) form.submit();
+        };
+        dlg.showModal();
+      });
+    })();
+  </script>
+  {% block extra_scripts %}{% endblock %}
+</body>
+</html>

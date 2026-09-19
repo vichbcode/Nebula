@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+
+{% block title %}Politique de confidentialité — {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div class="card narrow-card" style="max-width: 720px; margin: 0 auto;">
+  <h1 class="card-title">Politique de confidentialité</h1>
+  <p class="muted">Dernière mise à jour : septembre 2026</p>
+
+  <section class="legal-section">
+    <h2>1. Responsable du traitement</h2>
+    <p>Éditeur : <strong>Anonyme</strong> (pseudo).<br>
+    Contact : <a href="mailto:zogixa@proton.com">zogixa@proton.com</a></p>
+  </section>
+
+  <section class="legal-section">
+    <h2>2. Données collectées</h2>
+    <ul>
+      <li><strong>Comptes inscrits</strong> : pseudo, mot de passe (stocké de façon irréversible, haché), date de création du compte.</li>
+      <li><strong>Comptes invités</strong> : pseudonyme (commençant par #). Le compte invité est <strong>supprimé automatiquement à la déconnexion</strong> de l'utilisateur.</li>
+      <li><strong>Messages</strong> publiés dans les communautés, ainsi que leur date et leur auteur, nécessaires au fonctionnement du service.</li>
+      <li><strong>Cookie de session</strong> : un cookie technique strictement nécessaire pour rester connecté. Aucun cookie publicitaire, aucune donnée de profilage.</li>
+    </ul>
+    <p>Le site ne collecte ni adresse e-mail d'inscription, ni adresse IP à des fins d'analyse, ni données de navigation. Aucun outil de statistiques tiers n'est intégré.</p>
+  </section>
+
+  <section class="legal-section">
+    <h2>3. Finalités et base légale</h2>
+    <p>Les données sont utilisées uniquement pour :</p>
+    <ul>
+      <li>créer et authentifier votre compte (exécution du service) ;</li>
+      <li>afficher votre pseudonyme et vos messages dans les communautés ;</li>
+      <li>assurer la modération et la sécurité du site (lutte contre le bannissement, les abus).</li>
+    </ul>
+  </section>
+
+  <section class="legal-section">
+    <h2>4. Durées de conservation</h2>
+    <ul>
+      <li>Comptes inscrits : tant que vous n'avez pas demandé leur suppression, ou jusqu'à leur bannissement.</li>
+      <li>Comptes invités : supprimés automatiquement à votre déconnexion ou à votre bannissement.</li>
+      <li>Messages : conservés tant que la communauté qui les contient existe.</li>
+    </ul>
+  </section>
+
+  <section class="legal-section">
+    <h2>5. Appels audio et vidéo (Jitsi Meet)</h2>
+    <p>Les appels sont proposés via le service tiers <strong>Jitsi Meet</strong> (meet.jit.si), édité par 8×8 Inc. Les flux audio/vidéo circulent en chiffrement direct entre les participants et ne sont pas enregistrés par {{ SITE_NAME }}. Le traitement de ces données relève de la politique de confidentialité de Jitsi (jitsi.org).</p>
+  </section>
+
+  <section class="legal-section">
+    <h2>6. Hébergement et transfert des données</h2>
+    <p>Le site est hébergé par <strong>Vercel Inc.</strong> (440 North Barranca Avenue, Suite 4133, Covina, CA 91723, États-Unis). Les données peuvent donc être stockées sur des serveurs situés aux États-Unis ou dans l'Union européenne. Vercel adhère aux accords de protection des données applicables (clauses contractuelles types RGPD).</p>
+  </section>
+
+  <section class="legal-section">
+    <h2>7. Sécurité</h2>
+    <p>Les mots de passe sont hachés, les échanges chiffrés en HTTPS, et l'accès à l'espace d'administration est réservé aux administrateurs du site.</p>
+  </section>
+
+  <section class="legal-section">
+    <h2>8. Vos droits</h2>
+    <p>Conformément au Règlement général sur la protection des données (RGPD), vous disposez des droits d'<strong>accès</strong>, de <strong>rectification</strong>, d'<strong>effacement</strong> (suppression de votre compte depuis la page Paramètres), de <strong>limitation</strong>, de <strong>portabilité</strong> et d'<strong>opposition</strong>.</p>
+    <p>Pour exercer ces droits, écrivez à : <a href="mailto:zogixa@proton.com">zogixa@proton.com</a>. Nous répondrons dans un délai d'un mois.</p>
+    <p>Si vous estimez que vos droits ne sont pas respectés, vous pouvez saisir la <strong>CNIL</strong> (cnil.fr).</p>
+  </section>
+</div>
+{% endblock %}

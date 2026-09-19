@@ -1,0 +1,169 @@
+{% extends 'base.html' %}
+
+{% block title %}Gérer {{ community.name }} — {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-head row-head">
+  <div>
+    <a class="back-link" href="{% url 'communities:detail' community.slug %}">← Retour à {{ community.name }}</a>
+    <h1 class="page-title">Gestion de {{ community.name }}</h1>
+    <div class="head-tags">
+      {% if community.guests_allowed %}
+        <span class="badge guest">Accès invités ouvert</span>
+      {% else %}
+        <span class="badge private">Privée</span>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="grid-2 manage-grid">
+
+  {% if perms.manage_members or perms.ban_users %}
+    <div class="card manage-card span-full">
+      <div class="card-headline">
+        <h3 class="card-title">Membres <span class="muted">({{ members|length }})</span></h3>
+      </div>
+
+      {% if perms.manage_members %}
+      <form method="post" action="{% url 'communities:manage_add_member' community.slug %}" class="row gap">
+        {% csrf_token %}
+        <input name="username" class="input" placeholder="Pseudo de l'utilisateur à ajouter" autocomplete="off">
+        <button class="btn primary" type="submit">Ajouter</button>
+      </form>
+      <div class="divider"></div>
+      {% endif %}
+
+      <ul class="admin-list">
+        {% for m in members %}
+          <li class="admin-row">
+            <div class="chat-avatar {% if m.user.is_guest %}guest{% elif m.user.is_site_admin %}admin{% elif m.role == 'sub_admin' %}subadmin{% endif %}">
+              {{ m.user.username|slice:":1"|upper }}
+            </div>
+            <div class="member-info">
+              <span class="chat-author">{{ m.user.username }}</span>
+              <span class="muted">
+                {% if m.user.is_site_admin %}Admin site
+                {% elif m.role == 'sub_admin' %}Sous-admin
+                {% else %}Membre
+                {% endif %}
+                · {% if m.user.is_online %}<span class="on">En ligne</span>{% else %}Hors ligne{% endif %}
+              </span>
+            </div>
+            <div class="row gap small gap-actions">
+              {% if perms.manage_members and not m.user.is_site_admin %}
+                <form method="post" action="{% url 'communities:manage_remove_member' community.slug m.user.id %}">
+                  {% csrf_token %}
+                  <button class="btn ghost small" type="submit" title="Retirer de la communauté">Retirer</button>
+                </form>
+              {% endif %}
+              {% if perms.manage_subadmins and not m.user.is_site_admin %}
+                {% if m.role == 'sub_admin' %}
+                  <form method="post" action="{% url 'communities:manage_demote' community.slug m.user.id %}">
+                    {% csrf_token %}
+                    <button class="btn ghost small" type="submit">Rétrograder</button>
+                  </form>
+                {% else %}
+                  <details class="dropdown">
+                    <summary class="btn ghost small">Nommer sous-admin</summary>
+                    <form method="post" action="{% url 'communities:manage_promote' community.slug m.user.id %}" class="card subadmin-form">
+                      {% csrf_token %}
+                      <label class="switch-row"><input type="checkbox" name="can_manage_members" value="true"> Gérer les membres</label>
+                      <label class="switch-row"><input type="checkbox" name="can_moderate" value="true"> Modérer les messages</label>
+                      <label class="switch-row"><input type="checkbox" name="can_edit_community" value="true"> Modifier la communauté</label>
+                      <label class="switch-row"><input type="checkbox" name="can_ban_users" value="true"> Bannir des utilisateurs</label>
+                      <label class="switch-row"><input type="checkbox" name="can_launch_calls" value="true"> Lancer les appels</label>
+                      <button class="btn primary" type="submit">Valider</button>
+                    </form>
+                  </details>
+                {% endif %}
+              {% endif %}
+              {% if perms.ban_users and not m.user.is_site_admin %}
+                {% if m.user.is_banned %}
+                  {% if request.user.is_site_admin %}
+                    <form method="post" action="{% url 'communities:manage_unban_user' community.slug m.user.id %}">
+                      {% csrf_token %}
+                      <button class="btn ghost small success" type="submit">Débloquer</button>
+                    </form>
+                  {% else %}
+                    <span class="muted" style="font-size:.75rem;">Banni globalement</span>
+                  {% endif %}
+                {% elif request.user.is_site_admin %}
+                  <form method="post" action="{% url 'communities:manage_ban_user' community.slug m.user.id %}">
+                    {% csrf_token %}
+                    <button class="btn ghost small danger" type="submit"
+                            data-confirm="Bannir {{ m.user.username }} ? Il sera déconnecté et bloqué.">Bannir</button>
+                  </form>
+                {% else %}
+                  <form method="post" action="{% url 'communities:manage_ban_user' community.slug m.user.id %}">
+                    {% csrf_token %}
+                    <button class="btn ghost small danger" type="submit"
+                            data-confirm="Retirer {{ m.user.username }} de cette communauté ? (pas de bannissement global)">Retirer</button>
+                  </form>
+                {% endif %}
+              {% endif %}
+            </div>
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+
+  {% if perms.toggle_guests or perms.edit_community %}
+    <div class="card manage-card">
+      <h3 class="card-title">Paramètres</h3>
+      {% if perms.toggle_guests %}
+        <div class="setting-row">
+          <div class="setting-label">
+            <strong>Accès invités</strong>
+            <span class="muted">{% if community.guests_allowed %}Ouvert{% else %}Fermé{% endif %}</span>
+          </div>
+          <form method="post" action="{% url 'communities:manage_toggle_guests' community.slug %}">
+            {% csrf_token %}
+            <button class="btn ghost small" type="submit">{% if community.guests_allowed %}Fermer{% else %}Ouvrir{% endif %}</button>
+          </form>
+        </div>
+      {% endif %}
+
+      {% if perms.edit_community %}
+        <div class="divider"></div>
+        <form method="post" action="{% url 'communities:manage_edit' community.slug %}" novalidate>
+          {% csrf_token %}
+          <label class="field">
+            <span class="field-label">Nom</span>
+            <input name="name" class="input" value="{{ community.name }}" required>
+          </label>
+          <label class="field">
+            <span class="field-label">Description</span>
+            <textarea name="description" class="input textarea" rows="3">{{ community.description }}</textarea>
+          </label>
+          <button class="btn primary" type="submit">Mettre à jour</button>
+        </form>
+      {% endif %}
+    </div>
+  {% endif %}
+
+  {% if request.user.is_site_admin %}
+    <div class="card manage-card danger-zone">
+      <h3 class="card-title danger">Zone dangereuse</h3>
+      <p class="muted">Supprime définitivement cette communauté et tous ses messages.</p>
+      <button class="btn danger" onclick="document.getElementById('delete-dialog').showModal()">Supprimer la communauté</button>
+    </div>
+
+    <dialog id="delete-dialog" class="confirm-dialog">
+      <div class="card">
+        <h3 class="card-title danger">Confirmer la suppression</h3>
+        <p>Supprimer définitivement « {{ community.name }} » et tous ses messages ? Cette action est irréversible.</p>
+        <div class="dialog-actions">
+          <button class="btn ghost" onclick="this.closest('dialog').close()">Annuler</button>
+          <form method="post" action="{% url 'communities:manage_delete' community.slug %}" style="display:inline">
+            {% csrf_token %}
+            <button class="btn danger" type="submit">Supprimer</button>
+          </form>
+        </div>
+      </div>
+    </dialog>
+  {% endif %}
+
+</div>
+{% endblock %}

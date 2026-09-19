@@ -1,0 +1,163 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ SITE_NAME }} — Rejoins une communauté{% endblock %}
+
+{% block body_class %}auth-body{% endblock %}
+
+{% block content %}
+<div class="landing">
+  <div class="landing-blobs" aria-hidden="true">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    <div class="blob blob-3"></div>
+  </div>
+
+  <section class="hero">
+    <div class="hero-copy">
+      <span class="tag-chip">
+        <span class="dot"></span>
+        {{ total_community_count }} communautés vivantes
+      </span>
+      <h1 class="hero-title">
+        Des communautés
+        <span class="grad-text">qui te ressemblent.</span>
+      </h1>
+      <p class="hero-sub">
+        Crée ton compte, rejoins des espaces, discute, appelle — ou passe juste
+        en tant qu'invité pour explorer sans engagement.
+      </p>
+      <div class="hero-feats">
+        <span class="feat">Comptes invités</span>
+        <span class="feat">Communautés privées</span>
+        <span class="feat">Appels vocal & vidéo</span>
+      </div>
+    </div>
+
+    <div class="auth-card" id="auth-card">
+      <div class="auth-tabs" role="tablist">
+        <button class="auth-tab" data-tab="guest" role="tab">Invité</button>
+        <button class="auth-tab" data-tab="register" role="tab">S'inscrire</button>
+        <button class="auth-tab" data-tab="login" role="tab">Se connecter</button>
+      </div>
+
+      <div class="auth-pane active" data-pane="guest">
+        <h2 class="pane-title">Entrer en invité</h2>
+        <p class="pane-sub">Aucune inscription. Ton pseudo commence par <code>#</code> et ton compte disparaît à la déconnexion.</p>
+        <form method="post" action="{% url 'accounts:guest' %}" novalidate>
+          {% csrf_token %}
+          <label class="field">
+            <span class="field-label">Pseudo invité</span>
+            {{ guest_form.pseudo }}
+          </label>
+          {% if guest_form.errors %}
+            <ul class="errorlist">
+              {% for err in guest_form.non_field_errors %}<li>{{ err }}</li>{% endfor %}
+              {% for field in guest_form %}{% for err in field.errors %}<li>{{ err }}</li>{% endfor %}{% endfor %}
+            </ul>
+          {% endif %}
+          <button class="btn primary block" type="submit">
+            Entrer avec mon pseudo invité
+          </button>
+        </form>
+        <div class="suggest">
+          <button type="button" class="btn ghost small" id="suggest-pseudo">Surprends-moi avec un pseudo</button>
+          <span id="suggest-output" class="muted"></span>
+        </div>
+      </div>
+
+      <div class="auth-pane" data-pane="register">
+        <h2 class="pane-title">Créer mon compte</h2>
+        <p class="pane-sub">Pseudo + mot de passe. C'est tout.</p>
+        <form method="post" action="{% url 'accounts:register' %}" novalidate>
+          {% csrf_token %}
+          {{ register_form.non_field_errors }}
+          <label class="field">
+            <span class="field-label">Pseudo</span>
+            {{ register_form.username }}
+          </label>
+          {% for error in register_form.username.errors %}
+            <p class="field-error">{{ error }}</p>
+          {% endfor %}
+          <label class="field">
+            <span class="field-label">Mot de passe</span>
+            {{ register_form.password1 }}
+          </label>
+          {% for error in register_form.password1.errors %}
+            <p class="field-error">{{ error }}</p>
+          {% endfor %}
+          <label class="field">
+            <span class="field-label">Confirme le mot de passe</span>
+            {{ register_form.password2 }}
+          </label>
+          {% for error in register_form.password2.errors %}
+            <p class="field-error">{{ error }}</p>
+          {% endfor %}
+          <button class="btn primary block" type="submit">
+            Créer mon compte
+          </button>
+        </form>
+      </div>
+
+      <div class="auth-pane" data-pane="login">
+        <h2 class="pane-title">Se connecter</h2>
+        <p class="pane-sub">Retrouve ton compte existant.</p>
+        <form method="post" action="{% url 'accounts:login' %}" novalidate>
+          {% csrf_token %}
+          {{ login_form.non_field_errors }}
+          <label class="field">
+            <span class="field-label">Pseudo</span>
+            {{ login_form.username }}
+          </label>
+          <label class="field">
+            <span class="field-label">Mot de passe</span>
+            {{ login_form.password }}
+          </label>
+          {% if login_form.errors %}
+            <ul class="errorlist">
+              {% for field, errs in login_form.errors.items %}
+                {% if field != '__all__' %}{% for err in errs %}<li>{{ err }}</li>{% endfor %}{% endif %}
+              {% endfor %}
+            </ul>
+          {% endif %}
+          <button class="btn primary block" type="submit">
+            Se connecter
+          </button>
+        </form>
+      </div>
+
+      <div class="auth-foot">
+        <span class="admin-note">Un souci ? Contacte un administrateur.</span>
+      </div>
+    </div>
+  </section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  var tabs = document.querySelectorAll('.auth-tab');
+  var panes = document.querySelectorAll('.auth-pane');
+
+  function activate(name) {
+    tabs.forEach(function (t) {
+      t.classList.toggle('active', t.dataset.tab === name);
+    });
+    panes.forEach(function (p) {
+      p.classList.toggle('active', p.dataset.pane === name);
+    });
+  }
+  tabs.forEach(function (t) {
+    t.addEventListener('click', function () { activate(t.dataset.tab); });
+  });
+  {% if active %}activate('{{ active }}');{% endif %}
+
+  var adj = ['Lumineux', 'Cosmique', 'Furtif', 'Électrique', 'Brillant', 'Mystique', 'Sauvage', 'Céleste', 'Rapide', 'Néon'];
+  var anm = ['Panda', 'Furet', 'Renard', 'Dauphin', 'Guépard', 'Hibou', 'Phoenix', 'Loutre', 'Gecko', 'Cheval'];
+  document.getElementById('suggest-pseudo').addEventListener('click', function () {
+    var n = adj[Math.floor(Math.random() * adj.length)] + anm[Math.floor(Math.random() * anm.length)] + Math.floor(1000 + Math.random() * 9000);
+    var out = document.getElementById('suggest-output');
+    out.textContent = '#' + n;
+  });
+</script>
+{% endblock %}

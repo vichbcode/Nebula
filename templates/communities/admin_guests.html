@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+
+{% block title %}Invités en ligne — {{ SITE_NAME }}{% endblock %}
+
+{% block content %}
+<div class="page-head row-head">
+  <div>
+    <h1 class="page-title">Comptes invités en ligne</h1>
+    <p class="page-sub">
+      Les invités sont éphémères : les comptes hors-ligne sont supprimés automatiquement.
+    </p>
+  </div>
+  <a class="btn ghost" href="{% url 'communities:admin_dashboard' %}">← Espace admin</a>
+</div>
+
+<div class="card">
+  <ul class="admin-list">
+    {% for g in guests %}
+      <li class="admin-row {% if g.is_banned %}row-muted{% endif %}">
+        <div class="chat-avatar guest">#</div>
+        <div class="member-info">
+          <span class="chat-author guest">{{ g.username }}</span>
+          <span class="muted">
+            {% if g.is_banned %}Banni{% else %}En ligne{% endif %}
+          </span>
+        </div>
+        <div class="row gap small">
+          <form method="post" action="{% url 'communities:admin_guests_action' g.id %}">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="{% if g.is_banned %}unban{% else %}ban{% endif %}">
+            {% if g.is_banned %}
+              <button class="btn ghost small success" type="submit">Débloquer</button>
+            {% else %}
+              <button class="btn ghost small danger" type="submit" data-confirm="Bannir l'invité {{ g.username }} ?">Bannir</button>
+            {% endif %}
+          </form>
+          <form method="post" action="{% url 'communities:admin_guests_action' g.id %}">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="delete">
+            <button class="btn ghost small danger" type="submit" data-confirm="Supprimer le compte invité {{ g.username }} ?">Supprimer</button>
+          </form>
+        </div>
+      </li>
+    {% empty %}
+      <li class="empty-row">
+        <p class="muted">Aucun invité connecté pour le moment.</p>
+      </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endblock %}
