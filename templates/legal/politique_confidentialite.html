@@ -19,6 +19,7 @@
       <li><strong>Comptes inscrits</strong> : pseudo, mot de passe (stocké de façon irréversible, haché), date de création du compte.</li>
       <li><strong>Comptes invités</strong> : pseudonyme (commençant par #). Le compte invité est <strong>supprimé automatiquement à la déconnexion</strong> de l'utilisateur.</li>
       <li><strong>Messages</strong> publiés dans les communautés, ainsi que leur date et leur auteur, nécessaires au fonctionnement du service.</li>
+      <li><strong>Données d'appel</strong> : l'auteur de l'appel, son type (audio/vidéo) et les horaires de début et de fin sont enregistrés pour activer puis clore l'appel. Le contenu audio/vidéo n'est jamais conservé.</li>
       <li><strong>Cookie de session</strong> : un cookie technique strictement nécessaire pour rester connecté. Aucun cookie publicitaire, aucune donnée de profilage.</li>
     </ul>
     <p>Le site ne collecte ni adresse e-mail d'inscription, ni adresse IP à des fins d'analyse, ni données de navigation. Aucun outil de statistiques tiers n'est intégré.</p>
@@ -40,22 +41,37 @@
       <li>Comptes inscrits : tant que vous n'avez pas demandé leur suppression, ou jusqu'à leur bannissement.</li>
       <li>Comptes invités : supprimés automatiquement à votre déconnexion ou à votre bannissement.</li>
       <li>Messages : conservés tant que la communauté qui les contient existe.</li>
+      <li>Appels : les métadonnées (qui a lancé l'appel, type, horodatage) sont conservées tant que la communauté existe ; le contenu audio/vidéo n'est jamais enregistré.</li>
     </ul>
   </section>
 
   <section class="legal-section">
-    <h2>5. Appels audio et vidéo (Jitsi Meet)</h2>
-    <p>Les appels sont proposés via le service tiers <strong>Jitsi Meet</strong> (meet.jit.si), édité par 8×8 Inc. Les flux audio/vidéo circulent en chiffrement direct entre les participants et ne sont pas enregistrés par {{ SITE_NAME }}. Le traitement de ces données relève de la politique de confidentialité de Jitsi (jitsi.org).</p>
+    <h2>5. Appels audio et vidéo</h2>
+    <p>Les appels utilisent la technologie <strong>WebRTC</strong> intégrée aux navigateurs. Deux modes sont possibles :</p>
+    <ul>
+      <li><strong>Relais LiveKit</strong> (mode principal) : les flux audio/vidéo sont relayés par le service <strong>LiveKit Cloud</strong>, édité par LiveKit Inc. Les flux sont chiffrés en transit (DTLS-SRTP). L'accès à l'appel repose sur un jeton signé à durée de vie courte (60 secondes), valable uniquement pour l'appel en cours.</li>
+      <li><strong>Pair-à-pair direct</strong> (mode de secours) : les flux circulent directement entre les participants, chiffrés de bout en bout (DTLS-SRTP), à l'aide des serveurs STUN de Google et, si la connexion directe s'avère impossible, du relais TURN <strong>Open Relay</strong> (Metered Inc.).</li>
+    </ul>
+    <p>Le site <strong>n'enregistre jamais les appels</strong> et n'y accède pas : la caméra et le micro ne sont activés que lorsque vous lancez ou rejoignez un appel, après votre accord (demande de permission du navigateur). Les autres participants à l'appel voient votre pseudo.</p>
+    <p>Données techniques : pendant un appel, les adresses IP des participants transitent par les serveurs concernés (LiveKit, STUN/TURN) à des fins de mise en relation ; elles ne sont ni stockées ni exploitées par {{ SITE_NAME }}.</p>
+    <p>Le traitement des données par ces sous-traitants (LiveKit Inc., Google LLC, Metered Inc.) relève de leurs politiques de confidentialité respectives.</p>
   </section>
 
   <section class="legal-section">
     <h2>6. Hébergement et transfert des données</h2>
     <p>Le site est hébergé par <strong>Vercel Inc.</strong> (440 North Barranca Avenue, Suite 4133, Covina, CA 91723, États-Unis). Les données peuvent donc être stockées sur des serveurs situés aux États-Unis ou dans l'Union européenne. Vercel adhère aux accords de protection des données applicables (clauses contractuelles types RGPD).</p>
+    <p>Les données d'application (comptes, messages, métadonnées d'appel) sont stockées sur <strong>Neon Inc.</strong> (PostgreSQL hébergé). Les flux des appels relayés par <strong>LiveKit Cloud</strong> font l'objet d'une politique de confidentialité propre à LiveKit Inc.</p>
   </section>
 
   <section class="legal-section">
     <h2>7. Sécurité</h2>
-    <p>Les mots de passe sont hachés, les échanges chiffrés en HTTPS, et l'accès à l'espace d'administration est réservé aux administrateurs du site.</p>
+    <ul>
+      <li>Mots de passe hachés de façon irréversible (jamais stockés en clair).</li>
+      <li>Échanges chiffrés en HTTPS, avec HSTS ; cookies de session protégés (Secure, HttpOnly, SameSite).</li>
+      <li>Protection CSRF sur tous les formulaires, politique de sécurité de contenu (CSP) et interdiction d'encadrement du site (anti-clickjacking).</li>
+      <li>Appels : flux chiffrés (DTLS-SRTP), jetons d'accès signés et à durée de vie courte, salon limité aux membres autorisés.</li>
+      <li>L'espace d'administration est réservé aux administrateurs du site.</li>
+    </ul>
   </section>
 
   <section class="legal-section">
