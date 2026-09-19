@@ -21,9 +21,12 @@ SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
 
 DEBUG = env_bool('DJANGO_DEBUG', '0')
 
+_allowed = os.environ.get('DJANGO_ALLOWED_HOSTS', '127.0.0.1,localhost')
+if os.environ.get('VERCEL'):
+    _allowed += ',.vercel.app'
 ALLOWED_HOSTS = [
     h.strip()
-    for h in os.environ.get('DJANGO_ALLOWED_HOSTS', '127.0.0.1,localhost').split(',')
+    for h in _allowed.split(',')
     if h.strip()
 ]
 
