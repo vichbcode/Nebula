@@ -14,6 +14,11 @@ class Community(models.Model):
         default=False,
         help_text='Si activé, les comptes invités peuvent accéder à cette communauté.',
     )
+    admins_only = models.BooleanField(
+        'Réservée aux administrateurs',
+        default=False,
+        help_text='Si activé, seuls les administrateurs du site peuvent voir et rejoindre cette communauté.',
+    )
     is_support = models.BooleanField(
         'Communauté d’assistance',
         default=False,

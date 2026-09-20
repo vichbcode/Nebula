@@ -48,6 +48,8 @@ def can_access(user, community):
         return False
     if user.is_site_admin:
         return True
+    if community.admins_only:
+        return False
     if user.is_guest:
         return community.guests_allowed
     return True

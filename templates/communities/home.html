@@ -67,6 +67,9 @@
         <div class="community-card-top">
           <div class="community-badge">{{ c.community.name|slice:":1"|upper }}</div>
           <div class="community-tags">
+            {% if c.community.admins_only %}
+              <span class="badge admin">Réservée aux admins</span>
+            {% endif %}
             {% if c.community.is_support %}
               <span class="badge support">Solliciter un admin</span>
             {% endif %}

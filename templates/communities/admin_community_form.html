@@ -35,6 +35,17 @@
       </label>
     </div>
 
+    <div class="setting-row">
+      <div class="setting-label">
+        <strong>Réservée aux administrateurs</strong>
+        <span class="muted">Si coché, seuls les admins du site peuvent la voir et la rejoindre (personne d'autre).</span>
+      </div>
+      <label class="switch-wrap">
+        {{ form.admins_only }}
+        <span class="switch-ui"></span>
+      </label>
+    </div>
+
     <button class="btn primary block" type="submit">{{ submit_label }}</button>
   </form>
 </div>

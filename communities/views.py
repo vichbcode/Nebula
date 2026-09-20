@@ -39,11 +39,11 @@ def index(request):
 def home(request):
     user = request.user
     if user.is_guest:
-        communities = Community.objects.filter(guests_allowed=True)
+        communities = Community.objects.filter(guests_allowed=True).exclude(admins_only=True)
     elif user.is_site_admin:
         communities = Community.objects.all()
     else:
-        communities = Community.objects.all()
+        communities = Community.objects.exclude(admins_only=True)
 
     cards = []
     for c in communities:

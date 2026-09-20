@@ -8,6 +8,9 @@
     <a class="back-link" href="{% url 'communities:detail' community.slug %}">← Retour à {{ community.name }}</a>
     <h1 class="page-title">Gestion de {{ community.name }}</h1>
     <div class="head-tags">
+      {% if community.admins_only %}
+        <span class="badge admin">Réservée aux admins</span>
+      {% endif %}
       {% if community.guests_allowed %}
         <span class="badge guest">Accès invités ouvert</span>
       {% else %}
@@ -137,6 +140,16 @@
             <span class="field-label">Description</span>
             <textarea name="description" class="input textarea" rows="3">{{ community.description }}</textarea>
           </label>
+          <div class="setting-row">
+            <div class="setting-label">
+              <strong>Réservée aux administrateurs</strong>
+              <span class="muted">Seuls les admins du site peuvent la voir et la rejoindre.</span>
+            </div>
+            <label class="switch-wrap">
+              <input type="checkbox" name="admins_only" class="switch" {% if community.admins_only %}checked{% endif %}>
+              <span class="switch-ui"></span>
+            </label>
+          </div>
           <button class="btn primary" type="submit">Mettre à jour</button>
         </form>
       {% endif %}

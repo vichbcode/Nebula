@@ -11,7 +11,7 @@ User = get_user_model()
 class CommunityForm(forms.ModelForm):
     class Meta:
         model = Community
-        fields = ('name', 'description', 'guests_allowed')
+        fields = ('name', 'description', 'guests_allowed', 'admins_only')
         widgets = {
             'name': forms.TextInput(attrs={
                 'class': 'input',
@@ -24,15 +24,25 @@ class CommunityForm(forms.ModelForm):
                 'rows': 4,
             }),
             'guests_allowed': forms.CheckboxInput(attrs={'class': 'switch'}),
+            'admins_only': forms.CheckboxInput(attrs={'class': 'switch'}),
         }
+
+    def clean(self):
+        cleaned = super().clean()
+        if cleaned.get('admins_only') and cleaned.get('guests_allowed'):
+            self.add_error(
+                'guests_allowed',
+                'Une communauté réservée aux admins ne peut pas être ouverte aux invités.',
+            )
+        return cleaned
 
 
 class CommunityEditForm(forms.ModelForm):
-    """Édition nom + description uniquement (ne touche pas l’appel ni les invités)."""
+    """Édition nom, description et accès (ne touche pas l’appel ni les invités)."""
 
     class Meta:
         model = Community
-        fields = ('name', 'description')
+        fields = ('name', 'description', 'admins_only')
         widgets = {
             'name': forms.TextInput(attrs={
                 'class': 'input',
@@ -44,6 +54,7 @@ class CommunityEditForm(forms.ModelForm):
                 'placeholder': 'Description… (optionnel)',
                 'rows': 4,
             }),
+            'admins_only': forms.CheckboxInput(attrs={'class': 'switch'}),
         }
 
 
