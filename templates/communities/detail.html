@@ -886,16 +886,25 @@
     if (base) { base.srcObject = null; base.removeAttribute('src'); }
   }
 
+  function lkErr(text) {
+    var el = document.getElementById('call-err-text');
+    if (el) el.textContent = text;
+    refreshError(true);
+  }
+
   function startLiveKit() {
     startPolling();
     fetch(jetonUrl, { credentials: 'same-origin' })
       .then(function (r) {
         if (r.status === 503) { useLiveKit = false; lkRoom = null; openP2P(); return null; }
         if (!r.ok) {
+          // Serveur d'appel indisponible : on reste dans l'appel et on
+          // bascule automatiquement en mode direct (P2P). Jamais de
+          // fermeture silencieuse : l'utilisateur doit voir quelque chose.
           useLiveKit = false;
-          refreshError(true);
-          inCall = false;
-          closeCallUi();
+          lkRoom = null;
+          lkErr('Le serveur d\u2019appel est indisponible\u2026 bascule en mode direct.');
+          openP2P();
           return null;
         }
         return r.json();
@@ -913,10 +922,13 @@
         return null;
       })
       .catch(function () {
+        // Connexion LiveKit refusée/échouée : bascule en P2P au lieu de
+        // tout fermer — sans quoi le bouton disparaît sans rien ouvrir.
         if (useLiveKit) disconnectLiveKit();
-        refreshError(true);
-        inCall = false;
-        closeCallUi();
+        lkRoom = null;
+        useLiveKit = false;
+        lkErr('Le serveur d\u2019appel a échoué\u2026 bascule en mode direct.');
+        openP2P();
       });
   }
 
