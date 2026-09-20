@@ -167,6 +167,7 @@ class Membership(models.Model):
     can_edit_community = models.BooleanField('Modifier la communauté', default=False)
     can_ban_users = models.BooleanField('Bannir des utilisateurs', default=False)
     can_launch_calls = models.BooleanField('Lancer les appels', default=False)
+    can_manage_subadmins = models.BooleanField('Gérer les sous-admins', default=False)
     joined_at = models.DateTimeField(auto_now_add=True, verbose_name='Rejoint le')
 
     class Meta:

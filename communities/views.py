@@ -77,6 +77,34 @@ def home_presence(request):
     })
 
 
+_STALE_CALL_MAX_MINUTES = 30
+_STALE_CALL_STARTER_MINUTES = 2
+
+
+def _is_stale_call(call):
+    """Un appel est abandonné quand son стартер a disparu ou qu'il est trop vieux."""
+    if call.started_at < timezone.now() - timedelta(minutes=_STALE_CALL_MAX_MINUTES):
+        return True
+    starter = call.started_by
+    if starter.last_seen is None:
+        return True
+    return timezone.now() - starter.last_seen > timedelta(minutes=_STALE_CALL_STARTER_MINUTES)
+
+
+def _expire_stale_calls(community):
+    """Supprime les appels orphelins (starter parti / appel jamais terminé).
+
+    Autoprotection : même si le « raccrocher » n'a pas abouti (API LiveKit
+    lente, onglet fermé…), l'appel fantôme disparaît tout seul en ~2 min et
+    le bouton « Appel vidéo » revient sur toutes les pages.
+    """
+    for call in list(community.calls.all()):
+        if _is_stale_call(call):
+            if is_enabled():
+                close_room(call)
+            call.delete()
+
+
 @never_cache
 def community_detail(request, slug):
     community = get_object_or_404(Community, slug=slug)
@@ -87,6 +115,8 @@ def community_detail(request, slug):
         if not user.is_authenticated:
             return redirect('accounts:welcome')
         return render(request, 'communities/no_access.html', {'community': community})
+
+    _expire_stale_calls(community)
 
     perms = perms_for(user, community)
     membership = community.user_membership(user)
@@ -287,15 +317,23 @@ def support_reply(request, slug, thread_pk):
 
     form = SupportReplyForm(request.POST)
     if form.is_valid():
-        SupportMessage.objects.create(
-            thread=thread,
-            author=request.user,
-            text=form.cleaned_data['text'],
+        text = form.cleaned_data['text']
+        recent_duplicate = (
+            SupportMessage.objects
+            .filter(thread=thread, author=request.user, text=text,
+                    created_at__gte=timezone.now() - timedelta(seconds=12))
+            .exists()
         )
-        if request.user.is_site_admin:
-            thread.messages.filter(author=thread.user, is_read=False).update(is_read=True)
-        elif thread.admin_id:
-            thread.messages.filter(author=thread.admin, is_read=False).update(is_read=True)
+        if not recent_duplicate:
+            SupportMessage.objects.create(
+                thread=thread,
+                author=request.user,
+                text=text,
+            )
+            if request.user.is_site_admin:
+                thread.messages.filter(author=thread.user, is_read=False).update(is_read=True)
+            elif thread.admin_id:
+                thread.messages.filter(author=thread.admin, is_read=False).update(is_read=True)
     return redirect('communities:support_thread', slug=community.slug, thread_pk=thread.pk)
 
 
@@ -357,9 +395,17 @@ def post_message(request, slug):
     if request.method == 'POST' and can_post(request.user, community):
         form = MessageForm(request.POST)
         if form.is_valid():
-            form.instance.community = community
-            form.instance.author = request.user
-            form.save()
+            text = form.cleaned_data['text']
+            recent_duplicate = (
+                Message.objects
+                .filter(community=community, author=request.user, text=text,
+                        created_at__gte=timezone.now() - timedelta(seconds=12))
+                .exists()
+            )
+            if not recent_duplicate:
+                form.instance.community = community
+                form.instance.author = request.user
+                form.save()
         return redirect('communities:detail', slug=community.slug)
     return redirect('communities:detail', slug=community.slug)
 
@@ -484,11 +530,15 @@ def end_call(request, slug, call_pk):
     if request.method == 'POST' and (
         user.is_site_admin or call.started_by_id == user.pk
     ):
-        if is_enabled():
-            close_room(call)
+        # Supprimer l'appel AVANT tout appel réseau LiveKit : si l'API
+        # traîne (ou est coupée), l'appel ne doit JAMAIS rester bloqué
+        # côté serveur, sinon « Rejoindre l'appel » persiste partout.
+        deleted_pk = call.pk
         call.delete()
+        if is_enabled():
+            close_room(call)  # best-effort (timeout 3 s), jamais bloquant
         messages.info(request, 'Appel terminé.')
-        print(f'[CALL] END call={call_pk} by {user.username}', flush=True)
+        print(f'[CALL] END call={deleted_pk} by {user.username}', flush=True)
     return redirect('communities:detail', slug=community.slug)
 
 
@@ -540,6 +590,7 @@ def call_status(request, slug):
     user = request.user
     if not (user.is_authenticated and can_access(user, community)):
         return JsonResponse({'error': 'Accès refusé.'}, status=403)
+    _expire_stale_calls(community)
     call = community.calls.first()
     if not call:
         return JsonResponse({'active': False, 'call_pk': None})
@@ -773,6 +824,7 @@ def manage_demote(request, slug, user_id):
                 can_edit_community=False,
                 can_ban_users=False,
                 can_launch_calls=False,
+                can_manage_subadmins=False,
             )
             messages.success(request, 'Le membre a été retiré de l’équipe de modération.')
     return redirect('communities:manage', slug=community.slug)
@@ -903,6 +955,16 @@ def admin_guests_action(request, user_id):
     return redirect('communities:admin_guests')
 
 
+SUB_ADMIN_RIGHTS = [
+    ('can_manage_members', 'Gérer les membres'),
+    ('can_moderate', 'Modérer les messages'),
+    ('can_edit_community', 'Modifier la communauté'),
+    ('can_ban_users', 'Bannir des utilisateurs'),
+    ('can_launch_calls', 'Lancer les appels'),
+    ('can_manage_subadmins', 'Gérer les sous-admins'),
+]
+
+
 @admin_required
 def admin_admins(request):
     admins = list(User.objects.filter(is_site_admin=True).order_by('username'))
@@ -950,5 +1012,53 @@ def admin_admins(request):
                 target.is_staff = False
                 target.save()
                 messages.success(request, f'{target.username} n’est plus administrateur.')
+        elif action == 'nominate_sub':
+            username = request.POST.get('username', '').strip()
+            community = Community.objects.filter(pk=request.POST.get('community_id') or 0).first()
+            target = User.objects.filter(username__iexact=username, is_guest=False).first()
+            if not target:
+                messages.error(request, f'Aucun utilisateur inscrit « {username} ».')
+            elif not community:
+                messages.error(request, 'Choisis une communauté.')
+            elif target.is_site_admin:
+                messages.info(request, f'{target.username} est admin du site : il a déjà tous les pouvoirs.')
+            else:
+                membership, _ = Membership.objects.get_or_create(
+                    user=target, community=community, defaults={'role': Membership.ROLE_MEMBER}
+                )
+                form = SubAdminRightsForm(request.POST, instance=membership)
+                if form.is_valid():
+                    membership = form.save(commit=False)
+                    membership.role = Membership.ROLE_SUB_ADMIN
+                    membership.save()
+                    messages.success(
+                        request,
+                        f'{target.username} est maintenant sous-admin de « {community.name} ».',
+                    )
+                else:
+                    messages.error(request, 'Formulaire invalide.')
+        elif action == 'revoke_sub':
+            membership = get_object_or_404(Membership, pk=request.POST.get('membership_id'))
+            if membership.role != Membership.ROLE_SUB_ADMIN:
+                messages.info(request, 'Ce membre n’est plus sous-admin.')
+            else:
+                name = membership.user.username
+                community_name = membership.community.name
+                membership.role = Membership.ROLE_MEMBER
+                for field, _ in SUB_ADMIN_RIGHTS:
+                    setattr(membership, field, False)
+                membership.save()
+                messages.success(request, f'{name} n’est plus sous-admin de « {community_name} ».')
         return redirect('communities:admin_admins')
-    return render(request, 'communities/admin_admins.html', {'admins': admins})
+    sub_admins = (
+        Membership.objects
+        .filter(role=Membership.ROLE_SUB_ADMIN)
+        .select_related('user', 'community')
+        .order_by('user__username')
+    )
+    return render(request, 'communities/admin_admins.html', {
+        'admins': admins,
+        'sub_admins': sub_admins,
+        'communities': Community.objects.all().order_by('name'),
+        'rights_labels': SUB_ADMIN_RIGHTS,
+    })

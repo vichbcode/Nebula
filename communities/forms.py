@@ -84,13 +84,14 @@ class MessageForm(forms.ModelForm):
 class SubAdminRightsForm(forms.ModelForm):
     class Meta:
         model = Membership
-        fields = ('can_manage_members', 'can_moderate', 'can_edit_community', 'can_ban_users', 'can_launch_calls')
+        fields = ('can_manage_members', 'can_moderate', 'can_edit_community', 'can_ban_users', 'can_launch_calls', 'can_manage_subadmins')
         widgets = {
             'can_manage_members': forms.CheckboxInput(attrs={'class': 'switch small'}),
             'can_moderate': forms.CheckboxInput(attrs={'class': 'switch small'}),
             'can_edit_community': forms.CheckboxInput(attrs={'class': 'switch small'}),
             'can_ban_users': forms.CheckboxInput(attrs={'class': 'switch small'}),
             'can_launch_calls': forms.CheckboxInput(attrs={'class': 'switch small'}),
+            'can_manage_subadmins': forms.CheckboxInput(attrs={'class': 'switch small'}),
         }
 
 

@@ -104,6 +104,16 @@
       var close = e.target.closest('.toast-close');
       if (close) close.parentElement.remove();
     });
+    document.addEventListener('submit', function (e) {
+      var f = e.target;
+      if (f.dataset.onceBusy) { e.preventDefault(); return; }
+      var btns = f.querySelectorAll('button[type="submit"]');
+      if (!btns.length) return;
+      f.dataset.onceBusy = '1';
+      setTimeout(function () {
+        for (var i = 0; i < btns.length; i++) btns[i].disabled = true;
+      }, 0);
+    });
     setTimeout(function () {
       document.querySelectorAll('.toast').forEach(function (t) {
         t.classList.add('toast-out');

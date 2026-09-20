@@ -65,4 +65,65 @@
     </form>
   </div>
 </div>
+
+<div class="card" style="margin-top:1.5rem">
+  <h3 class="card-title">Sous-admins <span class="badge">{{ sub_admins|length }}</span></h3>
+  <p class="muted">Un sous-admin n'agit que sur <strong>une communauté précise</strong>. Nomme un membre, choisis sa communauté et coche ses autorisations.
+  Tu peux tout lui donner (appels, modification, bannissement, nomination de sous-admins…).</p>
+
+  <form method="post" class="grid-2" novalidate>
+    {% csrf_token %}
+    <input type="hidden" name="action" value="nominate_sub">
+    <div class="stack">
+      <label class="field">
+        <span class="field-label">Pseudo du membre</span>
+        <input class="input" name="username" placeholder="Le pseudo exact" autocomplete="off">
+      </label>
+      <label class="field">
+        <span class="field-label">Communauté</span>
+        <select class="input" name="community_id">
+          {% for c in communities %}
+            <option value="{{ c.id }}">{{ c.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <button class="btn primary" type="submit">Nommer sous-admin</button>
+    </div>
+    <div class="stack">
+      <span class="field-label">Autorisations</span>
+      {% for field, label in rights_labels %}
+        <label class="switch-row"><input type="checkbox" name="{{ field }}" value="true"> {{ label }}</label>
+      {% endfor %}
+    </div>
+  </form>
+
+  {% if sub_admins %}
+  <div class="divider"></div>
+  <ul class="admin-list">
+    {% for m in sub_admins %}
+      <li class="admin-row">
+        <div class="chat-avatar subadmin">{{ m.user.username|slice:":1"|upper }}</div>
+        <div class="member-info">
+          <span class="chat-author">{{ m.user.username }}</span>
+          <span class="muted">Sous-admin · {{ m.community.name }}</span>
+          <span class="muted">
+            {% if m.can_manage_members %}Gérer les membres · {% endif %}
+            {% if m.can_moderate %}Modération · {% endif %}
+            {% if m.can_edit_community %}Modifier · {% endif %}
+            {% if m.can_ban_users %}Bannir · {% endif %}
+            {% if m.can_launch_calls %}Appels · {% endif %}
+            {% if m.can_manage_subadmins %}Gérer les sous-admins{% endif %}
+          </span>
+        </div>
+        <form method="post" action="{% url 'communities:admin_admins' %}">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="revoke_sub">
+          <input type="hidden" name="membership_id" value="{{ m.id }}">
+          <button class="btn ghost small" type="submit" data-confirm="Retirer {{ m.user.username }} des sous-admins de « {{ m.community.name }} » ?">Révoquer</button>
+        </form>
+      </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</div>
 {% endblock %}

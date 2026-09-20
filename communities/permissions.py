@@ -36,7 +36,7 @@ def perms_for(user, community):
         'ban_users': site_admin or (membership and membership.can_ban_users),
         'launch_calls': site_admin or (membership and membership.can_launch_calls),
         'toggle_guests': site_admin,
-        'manage_subadmins': site_admin,
+        'manage_subadmins': site_admin or (membership and membership.can_manage_subadmins),
     }
 
 

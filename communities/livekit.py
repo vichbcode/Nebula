@@ -57,6 +57,6 @@ def close_room(call):
             await client.aclose()
 
     try:
-        asyncio.run(_run())
+        asyncio.run(asyncio.wait_for(_run(), timeout=3))
     except Exception:
-        pass  # le salon n'existe pas forcément : ce n'est pas bloquant
+        pass  # le salon n'existe pas forcément : ce n'est jamais bloquant
