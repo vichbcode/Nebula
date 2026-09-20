@@ -346,6 +346,20 @@
   </div>
 {% endif %}
 
+{% if active_call and call_is_starter and not community.is_support %}
+  <div class="call-bar" id="call-starter-bar">
+    <span class="call-bar-info">
+      <span class="call-dot"></span>
+      Appel vidéo démarré
+    </span>
+    <button class="btn primary" type="button" data-open-call>Reprendre</button>
+    <form method="post" action="{% url 'communities:end_call' community.slug active_call.pk %}">
+      {% csrf_token %}
+      <button class="btn danger" type="submit" title="Terminer l'appel pour tout le monde">Raccrocher</button>
+    </form>
+  </div>
+{% endif %}
+
 {% if call_can_start or call_can_join %}
   {% if not community.is_support %}
   <div class="call-modal" id="call-modal">
@@ -1032,6 +1046,9 @@
 
   var joinBtn = document.querySelector('[data-join-call]');
   if (joinBtn) joinBtn.addEventListener('click', function () { if (activePk) openCall(); });
+
+  var openBtn = document.querySelector('[data-open-call]');
+  if (openBtn) openBtn.addEventListener('click', function () { if (activePk) openCall(); });
 
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && callModal && callModal.classList.contains('open')) {
