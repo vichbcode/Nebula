@@ -532,6 +532,26 @@ def call_signal(request, slug, call_pk):
     return JsonResponse({'error': 'Méthode non autorisée.'}, status=405)
 
 
+@never_cache
+@require_GET
+def call_status(request, slug):
+    """État de l'appel en cours : permet d'afficher/retirer « Rejoindre » en direct."""
+    community = get_object_or_404(Community, slug=slug)
+    user = request.user
+    if not (user.is_authenticated and can_access(user, community)):
+        return JsonResponse({'error': 'Accès refusé.'}, status=403)
+    call = community.calls.first()
+    if not call:
+        return JsonResponse({'active': False, 'call_pk': None})
+    return JsonResponse({
+        'active': True,
+        'call_pk': call.pk,
+        'mode': 'livekit' if is_enabled() else 'p2p',
+        'call_type': call.call_type,
+        'starter': call.started_by_id,
+    })
+
+
 def turn_credentials(request):
     """Identifiants TURN (time-limited) pour les appels vidéo.
 

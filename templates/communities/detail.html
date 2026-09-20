@@ -1034,17 +1034,24 @@
 
   if (activePk && window.location.search.indexOf('join=1') !== -1) openCall();
 
-  // Hors appel : si un appel signé vient d'être clôturé côté serveur
-  // (ex. l'initiateur a fermé son onglet / raccroché ailleurs), recharge la
-  // page pour retrouver le bouton « Appel vidéo » et retirer « Rejoindre ».
-  if (activePk && signalUrl) {
-    var aliveTimer = setInterval(function () {
+  // Hors appel : surveille l'état de l'appel en direct. Quand un appel
+  // démarre, la page se recharge et affiche « Rejoindre la vidéo » ; quand il
+  // se termine, elle retrouve le bouton « Appel vidéo ».
+  var callStatusUrl = {% if not community.is_support and request.user.is_authenticated and not request.user.is_guest %}'{% url 'communities:call_status' community.slug %}'{% else %}''{% endif %};
+  var pageCallPk = activePk;
+  if (callStatusUrl) {
+    var statusTimer = setInterval(function () {
       if (callModal && callModal.classList.contains('open')) return;
-      fetch(signalUrl + '?after=0', { credentials: 'same-origin' })
-        .then(function (r) { if (r.status === 404) window.location.reload(); })
+      fetch(callStatusUrl, { credentials: 'same-origin' })
+        .then(function (r) { if (!r.ok) throw new Error('bad'); return r.json(); })
+        .then(function (data) {
+          if (!data) return;
+          var now = data.active ? data.call_pk : 0;
+          if (now !== pageCallPk) window.location.reload();
+        })
         .catch(function () {});
     }, 3000);
-    window.addEventListener('pagehide', function () { clearInterval(aliveTimer); });
+    window.addEventListener('pagehide', function () { clearInterval(statusTimer); });
   }
 
   var log = document.getElementById('chat-log');

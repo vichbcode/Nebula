@@ -29,6 +29,7 @@ urlpatterns = [
     path('communaute/<slug:slug>/appel/<int:call_pk>/terminer/', views.end_call, name='end_call'),
     path('communaute/<slug:slug>/appel/<int:call_pk>/jeton/', views.livekit_token, name='livekit_token'),
     path('communaute/<slug:slug>/appel/<int:call_pk>/signal/', views.call_signal, name='call_signal'),
+    path('communaute/<slug:slug>/appel/etat/', views.call_status, name='call_status'),
     path('appel/turn/', views.turn_credentials, name='turn_credentials'),
 
     path('communaute/<slug:slug>/gestion/', views.manage_community, name='manage'),
