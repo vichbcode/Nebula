@@ -352,7 +352,7 @@
       <span class="call-dot"></span>
       Appel vidéo démarré
     </span>
-    <button class="btn primary" type="button" data-open-call>Reprendre</button>
+    <button class="btn primary" type="button" data-open-call>Rejoindre l'appel</button>
     <form method="post" action="{% url 'communities:end_call' community.slug active_call.pk %}">
       {% csrf_token %}
       <button class="btn danger" type="submit" title="Terminer l'appel pour tout le monde">Raccrocher</button>
@@ -704,6 +704,8 @@
     callModal.classList.add('open');
     var bar = document.getElementById('call-bar');
     if (bar) bar.style.display = 'none';
+    var sbar = document.getElementById('call-starter-bar');
+    if (sbar) sbar.style.display = 'none';
     if (livekitService && jetonUrl && window.LivekitClient) {
       console.log('[NEBULA] mode appel : LiveKit (SFU)');
       startLiveKit();
@@ -967,6 +969,8 @@
     if (callModal) callModal.classList.remove('open');
     var bar = document.getElementById('call-bar');
     if (bar && !inCall) bar.style.display = '';
+    var sbar = document.getElementById('call-starter-bar');
+    if (sbar && !inCall) sbar.style.display = '';
   }
 
   function refreshError(on) {
