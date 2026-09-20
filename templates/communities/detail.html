@@ -10,6 +10,7 @@
     display: none; flex-direction: column;
     background: radial-gradient(1000px 600px at 50% 10%, #141a30, #05060d 70%);
     width: 100vw; height: 100vh; overflow: hidden;
+    user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
   }
   .call-modal.open { display: flex; }
   .call-grid {
@@ -75,6 +76,7 @@
     border: 1px solid transparent; border-radius: 12px;
     font-size: 0.68rem; font-weight: 600; cursor: pointer;
     transition: background 0.15s ease, transform 0.1s ease;
+    touch-action: manipulation;
   }
   .call-btn:hover { background: rgba(255,255,255,0.16); }
   .call-btn:active { transform: scale(0.96); }
@@ -103,23 +105,70 @@
   }
 
   .call-modal { height: 100vh; height: 100dvh; }
+
+  /* ---------- Horloge d'appel (visuelle sur mobile) ---------- */
+  .call-clock {
+    position: fixed; top: calc(12px + env(safe-area-inset-top)); left: 12px;
+    z-index: 64; display: none; align-items: center; gap: 7px;
+    padding: 6px 12px; border-radius: 999px;
+    background: rgba(10,15,30,0.7); backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.12);
+    color: #fff; font-size: 0.8rem; font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .call-clock .call-dot { width: 8px; height: 8px; border-radius: 50%; background: #f87171;
+    animation: callPulse 1.6s ease-in-out infinite; display: inline-block; }
+  @keyframes callPulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.5); opacity: 0.55; }
+  }
+
   @media (max-width: 600px) {
+    .call-modal { touch-action: none; }
+    .call-clock { display: flex; }
     .call-grid {
       grid-template-columns: 1fr;
-      grid-auto-rows: minmax(140px, 30vh);
-      padding-top: calc(64px + env(safe-area-inset-top));
-      padding-bottom: calc(110px + env(safe-area-inset-bottom));
+      grid-auto-rows: minmax(0, 1fr);
+      gap: 8px;
+      padding: calc(6px + env(safe-area-inset-top)) 8px calc(118px + env(safe-area-inset-bottom));
+      align-content: stretch;
     }
+    .call-grid:empty::before {
+      font-size: 1.05rem; font-weight: 600; line-height: 1.5;
+      max-width: 86%; text-align: center;
+    }
+    .call-peer { border-radius: 16px; }
+    .call-name {
+      left: auto; right: 10px; bottom: 10px;
+      font-size: 0.8rem; padding: 4px 11px;
+    }
+    /* Aperçu local en incrustation (PiP) en haut à droite */
     .call-local {
-      width: 92px; height: 130px;
-      bottom: calc(92px + env(safe-area-inset-bottom)); right: 10px;
+      top: calc(10px + env(safe-area-inset-top)); right: 10px; bottom: auto;
+      width: 94px; height: 126px;
+      border-radius: 16px; border-width: 2px;
+      box-shadow: 0 14px 34px -10px rgba(0,0,0,0.9);
     }
+    .call-local .call-name { left: 4px; right: auto; bottom: 4px; font-size: 0.62rem; padding: 2px 6px; }
+    /* Barre de contrôles : grande, lisible, au-dessus de la barre de zones sûres */
     .call-toolbar {
-      bottom: calc(14px + env(safe-area-inset-bottom));
-      gap: 6px; padding: 8px 10px;
+      bottom: calc(max(14px, env(safe-area-inset-bottom)));
+      gap: 8px; padding: 10px 12px;
+      border-radius: 20px;
+      width: max-content; max-width: 94vw;
     }
-    .call-btn { min-width: 58px; padding: 7px 8px; }
-    .call-btn.danger { min-width: 66px; }
+    .call-btn {
+      min-width: 62px; min-height: 54px;
+      padding: 8px 10px; font-size: 0.72rem; gap: 4px;
+      border-radius: 14px;
+    }
+    .call-btn svg { width: 26px; height: 26px; }
+    .call-btn.danger { min-width: 72px; }
+    .call-btn.danger svg { width: 28px; height: 28px; }
+    .call-err {
+      top: calc(8px + env(safe-area-inset-top));
+      font-size: 0.82rem; max-width: 90%;
+    }
   }
 </style>
 {% endblock %}
@@ -367,6 +416,7 @@
     <div class="call-err" id="call-err" style="display:none;">
       <span id="call-err-text">Impossible d'accéder à la caméra ou au micro. Autorise-les dans le navigateur.</span>
     </div>
+    <div class="call-clock" id="call-clock"><span class="call-dot"></span><span id="call-timer">00:00</span></div>
     <div class="call-local" id="call-local-box">
       <video id="call-local" autoplay muted playsinline></video>
       <span class="call-name">Moi</span>
@@ -519,6 +569,7 @@
   function callEnded() {
     stopPolling();
     inCall = false;
+    stopClock();
     if (useLiveKit) { disconnectLiveKit(); }
     Object.keys(peers).forEach(function (p) { removePeer(p); });
     if (localStream) {
@@ -692,9 +743,30 @@
     delete peerName[peerId];
   }
 
+  var callTimerEl = document.getElementById('call-timer');
+  var callT0 = null;
+  var clockInt = null;
+  function startClock() {
+    if (!callTimerEl) return;
+    if (callT0 === null) { callT0 = Date.now(); clockTick(); }
+    if (!clockInt) clockInt = setInterval(clockTick, 1000);
+  }
+  function clockTick() {
+    if (!callTimerEl || callT0 === null) return;
+    var s = Math.max(0, Math.floor((Date.now() - callT0) / 1000));
+    var m = Math.floor(s / 60); s = s % 60;
+    callTimerEl.textContent = (m < 10 ? '0' + m : m) + ':' + (s < 10 ? '0' + s : s);
+  }
+  function stopClock() {
+    if (clockInt) { clearInterval(clockInt); clockInt = null; }
+    callT0 = null;
+    if (callTimerEl) callTimerEl.textContent = '00:00';
+  }
+
   function openCall() {
     if (!callModal || inCall) return;
     inCall = true;
+    startClock();
     micOn = true;
     camOn = true;
     if (micBtn) micBtn.classList.remove('off');
@@ -951,6 +1023,7 @@
   function closeCall() {
     inCall = false;
     stopPolling();
+    stopClock();
     if (useLiveKit) {
       disconnectLiveKit();
     } else {
@@ -1010,6 +1083,7 @@
   if (endCallForm) endCallForm.addEventListener('submit', function () {
     inCall = false;
     stopPolling();
+    stopClock();
   });
 
   window.addEventListener('pagehide', function () {
